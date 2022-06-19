@@ -1,6 +1,5 @@
 import numpy as np
 
-with open('../data/X.npy', 'rb') as f:
-	X = np.load(f)
+X = np.load('X.npy', allow_pickle=True)
 
 print(X)
