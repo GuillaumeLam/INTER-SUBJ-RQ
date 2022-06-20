@@ -129,6 +129,7 @@ dmypy.json
 .pyre/
 
 # Data and generated files
-data/data.mat
-data/py_compatible_data.mat
-data/X.npy
+dataset/data.mat
+dataset/py_compatible_data.mat
+dataset/GoIS_dataset.npy
+dataset/nGoIS_dataset.npy
