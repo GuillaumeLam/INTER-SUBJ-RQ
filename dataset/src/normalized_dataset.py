@@ -51,35 +51,32 @@ def normalized_gait(A):
 	Y= interpolate.interp1d(x,A, kind='cubic')(np.linspace(x.min(), x.max(), 101))
 	return Y
 
-# entry: entry from retrieved dataset; shape: (patientNum, feature_trial, label)
-# out: array of entry with gait cycles for trials
-#    ; shape: [(patientNum, feature_gait_cycle_1, label), ... , (patientNum, feature_gait_cycle_N, label)]
-def trial2gcycles(entry,viz=False,i=None):
+# x: trial from retrieved dataset; shape: feature_trial
+# out: array of x with gait cycles for trials
+#    ; shape: [feature_gait_cycle_1, ... , feature_gait_cycle_N]
+def trial2gcycles(x,viz=False,i=None):
     if i is not None:
         print('tria2gcycles for i:'+str(i))
-    gc_entries = []
+    norm_gc_entries = []
     
-    g_events = gen_gait_cycles(entry[1],viz)
+    g_events = gen_gait_cycles(x,viz)
     
     for b_i, e_i in g_events:
-        new_entry = np.copy(entry)
-        un_norm_gc = entry[1][b_i:e_i,:,:] # replace trial with normalized gait cycle
-        
-        norm_gc = np.apply_along_axis(normalized_gait, 0,un_norm_gc) # (101,5,6)
-        
-        new_entry[1] = norm_gc
-        gc_entries.append(new_entry)
+        gc = x[b_i:e_i,:,:] # (b_i:e_i,5,6)
+        norm_gc = np.apply_along_axis(normalized_gait, 0,gc) # (101,5,6)
+        norm_gc_entries.append(norm_gc)
     
-    return gc_entries
+    norm_gc_entries = np.array(norm_gc_entries)
+    return norm_gc_entries
 
 tmp_len = 0
 progress = lambda tmp_len,total_len:print('Progress: ['+'='*int(tmp_len/total_len*50)+'>'+'-'*int((total_len-tmp_len)/total_len*50)+'] '+str(int(tmp_len/total_len*100))+'%'+' '*10, end='\r')
 
-def join(ar1,ar2, total_len):
-    arr = ar1
+def join(arr,ar2, total_len):
     
     for e in ar2:
-        arr.append(e)
+        # arr.append(e)
+        arr = np.append(arr, [e], axis=0)
 
     global tmp_len
 
@@ -92,41 +89,73 @@ def join(ar1,ar2, total_len):
 
     return arr
 
+def inner_flatten(d):
+    nX = np.empty((0,)+d[0][0][0].shape)
+    nP = np.empty((0,)+d[0][2].shape)
+    nY = []
+
+    l = len(d)
+    t = 0
+    for nx,y,p in d:
+        for e in nx:
+            nX = np.append(nX,[e], axis=0)
+            nP = np.append(nP, [p], axis=0)
+            nY.append(y)
+        progress(t,l)
+        t+=1
+
+    return nP,nX,np.array(nY)
+
 
 if __name__ == '__main__':
-    gois_dataset = np.load('../GoIS_dataset.npy', allow_pickle=True)
+    # gois_dataset = np.load('../GoIS_dataset.npy', allow_pickle=True)
+    X = np.load('../GoIS_X.npy', allow_pickle=True)
+    Y = np.load('../GoIS_Y.npy', allow_pickle=True)
+    P = np.load('../GoIS_P.npy', allow_pickle=True)
     
     print('Loaded Gait on Irregular Surface(GoIS) dataset')
     print('='*25)
-    print('Applying trial2gcycles on each entry')
+    print('Applying trial2gcycles on each x')
+    print('\n')
     print('trial2gcycles:')
     print('-find start of gait cycles in trial')
     print('-split gait cycles')
     print('-normalize gait cycles to 101 x 5 x 6')
+    print('\n')
 
     tmp_l = 0
 
-    t2g_p = lambda x: progress();
+    total_l = len(X)
 
-    total_l = len(gois_dataset)
+    def gen_meta_p(fn):
+        def fn_p(x):
+            global tmp_l
+            tmp_l+=1
+            progress(tmp_l,total_l)
 
-    def t2g_p(x):
-        global tmp_l
-        tmp_l+=1
-        progress(tmp_l,total_l)
+            return fn(x)
+        return fn_p
 
-        return trial2gcycles(x)
-
-    ngois_d = list(map(t2g_p,gois_dataset))
-
-    print('')
-    print('='*25)
+    nX = list(map(gen_meta_p(trial2gcycles),X))
+    
+    print('\n')
+    print('+'*25)
+    print('\n')
     print('Folding array of array of entries => into => an array of normalized gait entries')
     
-    ngois_dataset = functools.reduce(lambda x,y: join(x,y, len(ngois_d)), ngois_d)
+    gois = list(zip(nX,Y,P))
 
-    print('')
-    print('='*25)
-    print('normalized Gait on Irregular Surface dataset is ready! Saving it...!')
+    # nX = functools.reduce(lambda x,y: join(x,y, len(nX)), )
+    nP, nX, nY = inner_flatten(gois)
+
+    print('\n')
+    print('+'*25)
+    print('\n')
+    print('normalized features of Gait on Irregular Surface dataset is ready! Saving it...!')
     
-    np.save('../nGoIS_dataset', ngois_dataset)
+    print('Final shape of normalized features (X):')
+    print(nX.shape)
+
+    np.save('../GoIS_X_norm', nX)
+    np.save('../GoIS_P_norm', nP)
+    np.save('../GoIS_Y_norm', nY)
