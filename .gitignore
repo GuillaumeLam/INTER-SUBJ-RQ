@@ -131,5 +131,4 @@ dmypy.json
 # Data and generated files
 dataset/data.mat
 dataset/py_compatible_data.mat
-dataset/GoIS_dataset.npy
-dataset/nGoIS_dataset.npy
+dataset/GoIS_*.npy
