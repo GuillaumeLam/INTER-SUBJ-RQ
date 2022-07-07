@@ -19,6 +19,7 @@ print('Features generated')
 
 print(unique)
 
+np.save('../labels', unique)
 np.save('../GoIS_P', participantID)
 np.save('../GoIS_X', features)
 np.save('../GoIS_Y', one_hot_labels)
