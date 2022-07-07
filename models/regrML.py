@@ -132,6 +132,7 @@ def REGR_model(model_id, in_shape, out_shape, verbose=False):
 		model.add(Conv2DTranspose(3, kernel_size=(3,3), kernel_initializer='he_uniform', padding='same'))
 
 		model.add(Cropping2D(cropping=((6,5),(5,5))))
+		model.add(Flatten())
 
 	elif model_id in ['CNN_S','CNN_M','CNN_L']:
 		model.add(Input(shape=in_shape))
@@ -175,6 +176,7 @@ def REGR_model(model_id, in_shape, out_shape, verbose=False):
 		
 		# model.add(Dense(functools.reduce(lambda a, b: a*b,out_shape)))
 		# model.add(Reshape(out_shape))
+		model.add(Flatten())
 
 	# simple FFN
 	elif model_id == 'FFN_flat':
@@ -201,7 +203,39 @@ def REGR_model(model_id, in_shape, out_shape, verbose=False):
 		# model.add(Dense(functools.reduce(lambda a, b: a*b, out_shape)))
 		# model.add(Reshape(out_shape))
 
-	model.add(Flatten())
+	elif model_id == 'Shah_FNN':
+		model.add(Input(shape=in_shape))
+
+		model.add(Flatten())
+		model.add(Dense(606))
+		model.add(Dense(303))
+		model.add(Dense(606))
+
+	elif model_id == 'Shah_CNN':
+		model.add(Input(shape=in_shape))
+
+		# C1
+		model.add(Conv2D(124, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		# C2
+		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		#C3
+		model.add(Conv2D(512, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		model.add(Flatten())
+
+		model.add(Dense(256))
+
 	model.add(Dense(out_shape[0], activation='softmax'))
 
 	verbose and model.summary()
@@ -227,6 +261,13 @@ def CAE(d_shape, latent):
 		in_pad = ((2,1),(1,1))
 		out_crp = ((6,5),(5,5))
 		base = 16
+
+	elif d_shape[1] == 5:
+		in_pad = ((2,1),(2,1))
+		out_crp = ((6,5),(6,5))
+		base = 16
+
+	print(d_shape)
 
 	input_e = Input(shape=d_shape)
 	e = ZeroPadding2D(padding=in_pad)(input_e)
@@ -296,8 +337,8 @@ def REGR_pretrained_CNN(Ex,out_shape,save_path=None):
 	d = Flatten()(input_d)
 	d = Dense(1024)(d)
 	d = Dense(1024)(d)
-	d = Dense(functools.reduce(lambda a, b: a*b, out_shape))(d)
-	d = Reshape(out_shape)(d)
+	d = Dense(out_shape[0], activation='softmax')(d)
+	# d = Reshape(out_shape)(d)
 
 	dense = Model(input_d, d)
 
