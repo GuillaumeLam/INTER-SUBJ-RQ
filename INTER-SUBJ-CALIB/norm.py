@@ -46,25 +46,25 @@ def dataload(subject_wise):
 
 	print('Generated train, val, and test sets')
 
-	return x_train, y_train, x_val, y_val, x_test, y_test
-
-def gen_model(x_train, y_train, x_val, y_val):
-	# model = REGR_model('Shah_FNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	
-	# model = REGR_model('CNN_L', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	# model = AE_CNN(x_train, y_train)
-
-	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
-
-	print('Model Generated')
-
 	# print('Size training set')
 	# print(x_train.shape)
 	# print('Size testing set')
 	# print(x_test.shape)
 	# print('Size overall set')
 	# print(X.shape)
+
+	return x_train, y_train, x_val, y_val, x_test, y_test
+
+def gen_model(x_train, y_train, x_val, y_val):
+
+	model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
+	# model = REGR_model('Shah_FNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
+	# model = REGR_model('CNN_L', x_train.shape[1:], y_train.shape[1:], verbose=True)
+	# model = AE_CNN(x_train, y_train)
+
+	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
+
+	print('Model Generated')
 
 	# epochs = 20
 	# batch_size = 2
@@ -74,14 +74,6 @@ def gen_model(x_train, y_train, x_val, y_val):
 
 	# epochs = 3
 	# batch_size = 64
-
-	# model.fit(x_train,y_train, epochs=epochs,
-	# 			batch_size=batch_size,
-	# 			validation_data=(x_val,y_val),
-	# 			callbacks=[
-	# 				tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
-	# 			])
-
 
 	history = model.fit(x_train,y_train, epochs=epochs,
 				batch_size=batch_size,
@@ -103,13 +95,6 @@ def gen_model(x_train, y_train, x_val, y_val):
 	plt.legend()
 	plt.show()
 
-	# model.fit(x_train,y_train, epochs=50,
-	# 			batch_size=2,
-	# 			validation_split=0.1,
-	# 			callbacks=[
-	# 				tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
-	# 			])
-
 	return model
 
 def gen_line(subject_wise):
@@ -117,8 +102,6 @@ def gen_line(subject_wise):
 	model = gen_model(x_train, y_train, x_val, y_val)
 
 	mult_pred = model.predict(x_test)
-
-	# print(mult_pred)
 
 	y_hat = np.zeros_like(mult_pred)
 	y_hat[np.arange(len(mult_pred)), mult_pred.argmax(1)] = 1
@@ -135,9 +118,6 @@ def gen_line(subject_wise):
 	for l in labels:
 		f1_line.append(report_dict[l]['f1-score'])
 
-	# (y_test, y_hat)
-	# add eval
-	# gen f1 per label type line
 	return f1_line
 
 def gen_graph():
@@ -147,8 +127,9 @@ def gen_graph():
 	# add both to graph
 	sw_f1 = gen_line(subject_wise=True)
 	rw_f1 = gen_line(subject_wise=False)
-	
+
 	#display graph with model type
+	plt.clf()
 	plt.xticks(x,labels)
 	plt.plot(x, sw_f1, label='subject-wise')	
 	plt.plot(x, rw_f1, label='record-wise')	
@@ -162,7 +143,5 @@ if __name__ == '__main__':
 	# -show necessary calib to hit rnd-wise split from subj-wise split
 	# -lda
 	# -mag
-
-	# gen_line(True)
 
 	gen_graph()
