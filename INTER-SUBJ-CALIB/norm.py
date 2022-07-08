@@ -72,8 +72,8 @@ def gen_model(x_train, y_train, x_val, y_val):
 	epochs = 50
 	batch_size = 1
 
-	# epochs = 3
-	# batch_size = 64
+	# epochs = 1
+	# batch_size = 512
 
 	history = model.fit(x_train,y_train, epochs=epochs,
 				batch_size=batch_size,
@@ -83,17 +83,17 @@ def gen_model(x_train, y_train, x_val, y_val):
 				]
 				)
 
-	plt.clf()
-	plt.plot(history.history["loss"], label="Training Loss")
-	plt.plot(history.history["val_loss"], label="Validation Loss")
-	plt.legend()
-	plt.show()
+	# plt.clf()
+	# plt.plot(history.history["loss"], label="Training Loss")
+	# plt.plot(history.history["val_loss"], label="Validation Loss")
+	# plt.legend()
+	# plt.show()
 
-	plt.clf()
-	plt.plot(history.history["f1"], label="Training Loss")
-	plt.plot(history.history["val_f1"], label="Validation Loss")
-	plt.legend()
-	plt.show()
+	# plt.clf()
+	# plt.plot(history.history["f1"], label="Training Loss")
+	# plt.plot(history.history["val_f1"], label="Validation Loss")
+	# plt.legend()
+	# plt.show()
 
 	return model
 
@@ -111,7 +111,7 @@ def gen_line(subject_wise):
 	print('subject_wise=',subject_wise)
 	print(classification_report(y_test, y_hat,target_names=labels))
 
-	report_dict = classification_report(y_test, y_hat,target_names=labels)
+	report_dict = classification_report(y_test, y_hat,target_names=labels, output_dict=True)
 
 	f1_line = []
 
@@ -133,6 +133,7 @@ def gen_graph():
 	plt.xticks(x,labels)
 	plt.plot(x, sw_f1, label='subject-wise')	
 	plt.plot(x, rw_f1, label='record-wise')	
+	plt.legend()
 	plt.show()
 
 	return
