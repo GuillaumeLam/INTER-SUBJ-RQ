@@ -53,7 +53,7 @@ def dataload(subject_wise):
 	# print('Size overall set')
 	# print(X.shape)
 
-	return x_train, y_train, x_val, y_val, x_test, y_test
+	return x_train, y_train, x_val, y_val, x_test, y_test, p_test
 
 def gen_model(x_train, y_train, x_val, y_val):
 
@@ -69,11 +69,11 @@ def gen_model(x_train, y_train, x_val, y_val):
 	# epochs = 20
 	# batch_size = 2
 
-	epochs = 50
-	batch_size = 1
+	# epochs = 50
+	# batch_size = 1
 
-	# epochs = 1
-	# batch_size = 512
+	epochs = 1
+	batch_size = 512
 
 	history = model.fit(x_train,y_train, epochs=epochs,
 				batch_size=batch_size,
@@ -98,7 +98,7 @@ def gen_model(x_train, y_train, x_val, y_val):
 	return model
 
 def gen_line(subject_wise):
-	x_train, y_train, x_val, y_val, x_test, y_test = dataload(subject_wise=subject_wise)
+	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=subject_wise)
 	model = gen_model(x_train, y_train, x_val, y_val)
 
 	mult_pred = model.predict(x_test)
@@ -118,15 +118,15 @@ def gen_line(subject_wise):
 	for l in labels:
 		f1_line.append(report_dict[l]['f1-score'])
 
-	return f1_line
+	return f1_line, (model, x_test, y_test, p_test, x_val, y_val)
 
 def gen_graph():
 	labels = np.load('dataset/labels.npy', allow_pickle=True)
 	x = list(range(len(labels)))
 
 	# add both to graph
-	sw_f1 = gen_line(subject_wise=True)
-	rw_f1 = gen_line(subject_wise=False)
+	sw_f1, _ = gen_line(subject_wise=True)
+	rw_f1, _ = gen_line(subject_wise=False)
 
 	#display graph with model type
 	plt.clf()
@@ -138,6 +138,98 @@ def gen_graph():
 
 	return
 
+# calibrate subject-wise trained model with n_cycles and eval performance
+# func: generate calibration and test dataset from {X,Y,P}_test
+def calibrate(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=10):
+	# [OP] find patients with most number of gait cycles per label and calib on them
+
+	# split datasets based on patient id and label
+	p_y_dict = {}
+
+	for p_id in list(set(p_test)):
+		p_y_dict[p_id] = {}
+		for l in labels:
+			p_y_dict[p_id][l] = [np.empty((0,)+x_test.shape[1:]), np.empty((0,)+y_test.shape[1:]), np.empty((0,)+p_test.shape[1:])]
+
+	for i in range(len(p_test)):
+		p_y_dict[p_test[i]][oh2label(y_test[i])][0] = np.append(p_y_dict[p_test[i]][oh2label(y_test[i])][0], [x_test[i]], axis=0)
+		p_y_dict[p_test[i]][oh2label(y_test[i])][1] = np.append(p_y_dict[p_test[i]][oh2label(y_test[i])][1], [y_test[i]], axis=0)
+		p_y_dict[p_test[i]][oh2label(y_test[i])][2] = np.append(p_y_dict[p_test[i]][oh2label(y_test[i])][2], [p_test[i]], axis=0)
+
+	dict_stats(p_y_dict)
+
+	# split all arry in dict
+	calib = [np.empty((0,)+x_test.shape[1:]), np.empty((0,)+y_test.shape[1:]), np.empty((0,)+p_test.shape[1:])]
+	test = [np.empty((0,)+x_test.shape[1:]), np.empty((0,)+y_test.shape[1:]), np.empty((0,)+p_test.shape[1:])]
+
+	for k in p_y_dict:
+		for k2 in p_y_dict[k]:
+			# add n_cycles to calib and rest to test (keep at least 10% for test))
+			total_l = p_y_dict[k][k2][0].shape[0]
+			if n_cycle_per_label > 0.9*total_l:
+				# add 90% to calib and 10% to test
+				n_cycle_per_label = int(0.9*total_l)
+
+			for i in range(3):
+				calib[i] = np.append(calib[i], p_y_dict[k][k2][i][:n_cycle_per_label], axis=0)
+				test[i] = np.append(test[i], p_y_dict[k][k2][i][n_cycle_per_label:], axis=0)
+
+	print("Calib shape")
+	print("X_calib shape:", calib[0].shape)
+	print("Y_calib shape:", calib[1].shape)
+	print("P_calib shape:", calib[2].shape)
+
+	print("Test shape")
+	print("X_test shape:", test[0].shape)
+	print("Y_test shape:", test[1].shape)
+	print("P_test shape:", test[2].shape)
+
+	return calib, test
+
+	# epochs = 50
+	# batch_size = 1
+
+	# history = model.fit(x_calib,y_calib, epochs=epochs,
+	# 	batch_size=batch_size,
+	# 	validation_data=(x_val,y_val),
+	# 	callbacks=[
+	# 		tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
+	# 	]
+	# )
+
+def gen_calib_graph():
+	labels = np.load('dataset/labels.npy', allow_pickle=True)
+	x = list(range(len(labels)))
+
+	# add both to graph
+	sw_f1, sw_params = gen_line(subject_wise=True)
+	rw_f1, _ = gen_line(subject_wise=True)
+
+	n = 10
+
+	for i in range(10):
+		n_f1_line = calibrate(*sw_params, n_cycle_per_label=n)
+
+		n += 10
+
+
+def dict_stats(d):
+	from collections import Counter
+
+	for k in d:
+		print('P_id: ', k)
+
+		l = []
+		n = []
+		for k2 in d[k]:
+			l.append(k2)
+			n.append(d[k][k2][0].shape[0])
+		print(l)
+		print(n)
+
+labels = np.load('dataset/labels.npy', allow_pickle=True)	
+oh2label = lambda one_hot: labels[np.argmax(one_hot)]
+# label2oh = lambda label:	
 
 if __name__ == '__main__':
 	# todo
@@ -145,4 +237,12 @@ if __name__ == '__main__':
 	# -lda
 	# -mag
 
-	gen_graph()
+	# gen_graph()
+
+	# fnc calibrate() debug()
+	# =======================
+	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=True)
+	# model = gen_model(x_train, y_train, x_val, y_val)
+	model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
+
+	calibrate(model,x_test,y_test,p_test, x_val, y_val, n_cycle_per_label=4)
