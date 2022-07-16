@@ -1,59 +1,100 @@
-import os
-import sys
+import tensorflow as tf
 import numpy as np
 
-currentdir = os.path.dirname(os.path.realpath(__file__))
-parentdir = os.path.dirname(currentdir)
-sys.path.append(parentdir)
+import os
+import sys
+
+sys.path.append(os.getcwd())
 
 from util.subject_wise_split import subject_wise_split
 
-# ngois = np.load('../dataset/GoIS_dataset.npy', allow_pickle=True)
-X = np.load('../dataset/GoIS_X_norm.npy', allow_pickle=True)
-Y = np.load('../dataset/GoIS_Y.npy', allow_pickle=True)
-P = np.load('../dataset/GoIS_P.npy', allow_pickle=True)
+from models.metrics import f1
 
-x_train, y_train, x_test, y_test, p_train, p_test = subject_wise_split(X,Y, participant=P, subject_wise=True,split=0.1,seed=42)
-# print('Successful subject wise split!')
-# print('p_train shape:')
-# print(p_train.shape)
-# print('p_test shape:')
-# print(p_test.shape)
 
-# print('x_train shape:')
-# print(x_train.shape)
-# print('x_test shape:')
-# print(x_test.shape)
+labels = np.load('dataset/labels.npy', allow_pickle=True)	
+oh2label = lambda one_hot: labels[np.argmax(one_hot)]
 
-# print('y_train shape:')
-# print(y_train.shape)
-# print('y_test shape:')
-# print(y_test.shape)
+epochs = 50
+batch_size = 2
 
-# print('p[n] val:')
-# print(np.array(p_train))
-# print(np.array(p_test))
-# print('x[n] shape:')
-# print(x_train[0].shape)
-# print('y[n] val:')
-# print(y_train[0].shape)
+def dataload(subject_wise, seed=42):
+	X = np.load('dataset/GoIS_X_norm.npy', allow_pickle=True)
+	Y = np.load('dataset/GoIS_Y_norm.npy', allow_pickle=True)
+	P = np.load('dataset/GoIS_P_norm.npy', allow_pickle=True)
 
-x_train, y_train, x_val, y_val, p_train, p_val = subject_wise_split(x_train,y_train, participant=p_train, subject_wise=True,split=0.1,seed=42)
+	x_train, y_train, x_test, y_test, p_train, p_test = subject_wise_split(X, Y, participant=P, subject_wise=subject_wise,split=0.1,seed=seed)
 
-print('Generated train, val, and test sets')
+	x_train, y_train, x_val, y_val, p_train, p_val = subject_wise_split(x_train, y_train, participant=p_train, subject_wise=True,split=0.1,seed=seed)
 
-from models.regrML import REGR_model,REGR_compile
+	print('Generated train, val, and test sets')
 
-import tensorflow as tf
+	# print('Size training set')
+	# print(x_train.shape)
+	# print('Size testing set')
+	# print(x_test.shape)
+	# print('Size overall set')
+	# print(X.shape)
 
-model = REGR_model('FFN_flat', x_train.shape[1:], y_train.shape[1:], verbose=True)
-model = REGR_compile(model, 'categorical_crossentropy')
+	return x_train, y_train, x_val, y_val, x_test, y_test, p_test
 
-print('Model Generated')
+def gen_model(model, x_train, y_train, x_val, y_val):
 
-model.fit(x_train,y_train, epochs=20,
-			batch_size=2,
-			validation_data=(x_val,y_val),
-			callbacks=[
-				tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
-			])
+	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
+
+	print('Model Generated')
+
+	# print("CHECK: monitor val_loss or val_f1? (or else)")
+	# history = model.fit(x_train,y_train, epochs=epochs,
+	# 			batch_size=batch_size,
+	# 			validation_data=(x_val,y_val),
+	# 			callbacks=[
+	# 				tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
+	# 			]
+	# 			)
+
+	history = model.fit(x_train,y_train, epochs=epochs,
+				batch_size=batch_size,
+				validation_data=(x_val,y_val),
+				callbacks=[
+					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="min",restore_best_weights=True)
+				]
+				)
+
+	# plt.clf()
+	# plt.plot(history.history["loss"], label="Training Loss")
+	# plt.plot(history.history["val_loss"], label="Validation Loss")
+	# plt.legend()
+	# plt.show()
+
+	# plt.clf()
+	# plt.plot(history.history["f1"], label="Training Loss")
+	# plt.plot(history.history["val_f1"], label="Validation Loss")
+	# plt.legend()
+	# plt.show()
+
+	return model
+
+def keras_model_cpy(model):
+	model_cpy = tf.keras.models.clone_model(model)
+	model_cpy.build(model.input.shape)
+	model_cpy.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
+	model_cpy.set_weights(model.get_weights())
+
+	return model_cpy
+
+
+if __name__ == '__main__':
+	from split_diff import gen_shah_graph, gen_split_diff_models_graph
+	from calibration import gen_f1_calib_graph, gen_f1_calib_models_graph
+
+	# MINIMAL CODE TO GENERATE SHAH GRAPH
+	# gen_shah_graph()
+
+	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
+	# gen_split_diff_models_graph()
+
+	# MINIMAL CODE TO GENERATE CALIBRATION GRAPH
+	gen_f1_calib_graph()
+
+	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
+	# gen_f1_calib_models_graph()
