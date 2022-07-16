@@ -132,3 +132,5 @@ dmypy.json
 dataset/data.mat
 dataset/py_compatible_data.mat
 dataset/*.npy
+
+visual/*
