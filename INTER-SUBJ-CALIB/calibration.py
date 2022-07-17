@@ -153,8 +153,8 @@ def graph_f1_calib(model, detail=True):
 	######################################
 	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=True, seed=39)
 
-	# upper = 100
-	upper = 50
+	upper = 100
+	# upper = 50
 	x_axis = list(range(10,upper+10,10))
 
 	plt.clf()
@@ -267,9 +267,9 @@ def graph_f1_calib(model, detail=True):
 
 	return model_cpy # returned last calibrated model
 
-def gen_f1_calib_graph():
+def gen_f1_calib_graph(detail=True):
 	model = REGR_model('Shah_CNN', verbose=True)
-	graph_f1_calib(model)
+	graph_f1_calib(model, detail)
 
 def gen_f1_calib_models_graph():
 	# model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)

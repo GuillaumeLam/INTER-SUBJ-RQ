@@ -56,7 +56,7 @@ def gen_model(model, x_train, y_train, x_val, y_val):
 				batch_size=batch_size,
 				validation_data=(x_val,y_val),
 				callbacks=[
-					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="min",restore_best_weights=True)
+					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True)
 				]
 				)
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 	# gen_split_diff_models_graph()
 
 	# MINIMAL CODE TO GENERATE CALIBRATION GRAPH
-	gen_f1_calib_graph()
+	gen_f1_calib_graph(detail=False)
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
 	# gen_f1_calib_models_graph()

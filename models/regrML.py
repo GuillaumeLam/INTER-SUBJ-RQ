@@ -11,7 +11,7 @@ from tensorflow.keras.layers import Conv2DTranspose, UpSampling2D, Cropping2D
 
 from tensorflow.keras.utils import plot_model
 
-def REGR_model(model_id, in_shape, out_shape, verbose=False):
+def REGR_model(model_id, in_shape=(101,5,6), out_shape=(9,), verbose=False):
 
 	model = Sequential()
 	
@@ -215,7 +215,7 @@ def REGR_model(model_id, in_shape, out_shape, verbose=False):
 		model.add(Input(shape=in_shape))
 
 		# C1
-		model.add(Conv2D(124, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
 		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
 		model.add(BatchNormalization(center=True, scale=True))
 		model.add(Dropout(0.5))
@@ -235,6 +235,8 @@ def REGR_model(model_id, in_shape, out_shape, verbose=False):
 		model.add(Flatten())
 
 		model.add(Dense(256))
+
+		# model.add(Dense(128))
 
 	model.add(Dense(out_shape[0], activation='softmax'))
 
@@ -335,6 +337,7 @@ def REGR_pretrained_CNN(Ex,out_shape,save_path=None):
 	input_d = Input(shape=Ex.layers[-1].output_shape[1:])
 
 	d = Flatten()(input_d)
+	print('CHECK2: play with CNN shape?')
 	d = Dense(1024)(d)
 	d = Dense(1024)(d)
 	d = Dense(out_shape[0], activation='softmax')(d)
