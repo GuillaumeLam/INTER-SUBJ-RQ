@@ -117,7 +117,7 @@ def calibrate_sets(x_te, y_te, p_te, n_cycle_per_label=10, debug=False):
 	return calib, test
 
 # MOD: model
-def get_calib_point(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=4):
+def get_calib_point(model, model_id, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=4):
 	calib_set, test_set = calibrate_sets(x_test, y_test, p_test, n_cycle_per_label=n_cycle_per_label)
 
 	(x_calib, y_calib, p_calib), (x_calib_test, y_calib_test, p_calib_test) = calib_set, test_set	# keep P_{calib,test} for easy verification of split leak 
@@ -135,13 +135,13 @@ def get_calib_point(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_lab
 	plt.plot(history.history["loss"], label="Training")
 	plt.plot(history.history["val_loss"], label="Validation")
 	plt.legend()
-	plt.savefig('calib_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+	plt.savefig('./out/calib_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
 
 	plt.clf()
 	plt.plot(history.history["f1"], label="Training")
 	plt.plot(history.history["val_f1"], label="Validation")
 	plt.legend()
-	plt.savefig('calib_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+	plt.savefig('./out/calib_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
 
 	mult_pred = model.predict(x_calib_test)
 
@@ -170,7 +170,7 @@ def get_calib_line(model, model_id, seed=39):
 	for n in x_axis:
 		model_cpy = keras_model_cpy(sw_model)
 		params_cpy = model_cpy, x_test, y_test, p_test, x_val, y_val
-		calib_f1_n = get_calib_point(model_cpy, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=n)
+		calib_f1_n = get_calib_point(model_cpy, model_id, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=n)
 
 		for i, l_f1 in enumerate(calib_f1_n):
 			label_f1[i].append(l_f1)

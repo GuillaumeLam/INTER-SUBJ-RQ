@@ -60,13 +60,13 @@ def gen_model(model, model_id, x_train, y_train, x_val, y_val):
 	plt.plot(history.history["loss"], label="Training")
 	plt.plot(history.history["val_loss"], label="Validation")
 	plt.legend()
-	plt.savefig('model_gen_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+	plt.savefig('./out/model_gen_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
 	plt.clf()
 	plt.plot(history.history["f1"], label="Training")
 	plt.plot(history.history["val_f1"], label="Validation")
 	plt.legend()
-	plt.savefig('model_gen_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+	plt.savefig('./out/model_gen_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
 	# plt.show()
 
