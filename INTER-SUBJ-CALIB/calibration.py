@@ -306,6 +306,7 @@ def gen_f1_calib_models_graph():
 
 	models = []
 
+	models.append('Shah_CNNa')
 	models.append('Shah_CNN+')
 	models.append('Shah_CNN')
 	models.append('Shah_FNN')

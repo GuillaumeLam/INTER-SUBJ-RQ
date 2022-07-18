@@ -257,9 +257,30 @@ def REGR_model(model_id, in_shape=(101,5,6), out_shape=(9,), verbose=False):
 		model.add(BatchNormalization(center=True, scale=True))
 		model.add(Dropout(0.5))
 
-		#C4
-		model.add(Conv2D(1024, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+		model.add(Flatten())
+
+		model.add(Dense(512))
+		model.add(Dense(256))
+		model.add(Dense(128))
+
+	elif model_id == 'Shah_CNNa':
+		model.add(Input(shape=in_shape))
+
+		# C1
+		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		# C2
+		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		#C3
+		model.add(Conv2D(512, kernel_size=(3, 1), activation='relu', kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2, 1), padding='same'))
 		model.add(BatchNormalization(center=True, scale=True))
 		model.add(Dropout(0.5))
 
