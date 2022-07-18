@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 
+import wandb
+from wandb.keras import WandbCallback
+
 from main import dataload, gen_model, keras_model_cpy, labels, epochs, batch_size
 
 import os
@@ -56,7 +59,22 @@ def graph_split_diff(model, model_id, eval_only=False, seed=39):
 		f = model
 
 	# add both to graph
+	wandb.init(project='inter-subject-calibration', entity='guillaumelam')
+	wandb.run.name = 'init-train_subject-wise_'+model_id+'-e='+str(epochs)+'-bs='+str(batch_size)
+	wandb.config = {
+		'epochs': epochs,
+		'batch_size': batch_size,
+		'model_id': model_id
+	}
 	sw_f1, sw_model = get_f1_line(subject_wise=True, model_f=f, seed=seed)
+
+	wandb.init(project='inter-subject-calibration', entity='guillaumelam')
+	wandb.run.name = 'init-train_random-wise_'+model_id+'-e='+str(epochs)+'-bs='+str(batch_size)
+	wandb.config = {
+		'epochs': epochs,
+		'batch_size': batch_size,
+		'model_id': model_id
+	}
 	rw_f1, rw_model = get_f1_line(subject_wise=False, model_f=f, seed=seed)
 
 	# if # models & f1 lines stored, load them
@@ -64,11 +82,15 @@ def graph_split_diff(model, model_id, eval_only=False, seed=39):
 	# if not show_wait:
 	plt.clf()
 	plt.xticks(x,labels)
-	# plt.plot(x, sw_f1, label='subject-wise')	
-	# plt.plot(x, rw_f1, label='record-wise')
 
 	plt.plot(sw_f1, label='subject-wise')	
 	plt.plot(rw_f1, label='record-wise')
+	# plt.fill_between(
+	# 		x,
+	# 		avg_calib_f1-std_calib_f1,
+	# 		avg_calib_f1+std_calib_f1, 
+	# 		alpha=0.4
+	# 	)
 	plt.legend()
 	plt.savefig('./out/'+'sw_vs_rw_split_'+('eval_' if eval_only else '')+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 	# plt.show()

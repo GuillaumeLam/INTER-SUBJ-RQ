@@ -2,6 +2,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
+import wandb
+from wandb.keras import WandbCallback
+
 from subject_wise_split import subject_wise_split
 
 import os
@@ -17,7 +20,7 @@ labels = np.load('dataset/labels.npy', allow_pickle=True)
 oh2label = lambda one_hot: labels[np.argmax(one_hot)]
 
 epochs = 50
-batch_size = 2
+batch_size = 4
 
 # epochs = 2
 # batch_size = 2048
@@ -48,25 +51,28 @@ def gen_model(model, model_id, x_train, y_train, x_val, y_val):
 
 	print('Model Generated')
 
-	history = model.fit(x_train,y_train, epochs=epochs,
-				batch_size=batch_size,
+	config = wandb.config
+
+	history = model.fit(x_train,y_train, epochs=config['epochs'],
+				batch_size=config['batch_size'],
 				validation_data=(x_val,y_val),
 				callbacks=[
-					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True)
+					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True),
+					WandbCallback()
 				]
 				)
 
-	plt.clf()
-	plt.plot(history.history["loss"], label="Training")
-	plt.plot(history.history["val_loss"], label="Validation")
-	plt.legend()
-	plt.savefig('./out/model_gen_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+	# plt.clf()
+	# plt.plot(history.history["loss"], label="Training")
+	# plt.plot(history.history["val_loss"], label="Validation")
+	# plt.legend()
+	# plt.savefig('./out/model_gen_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
-	plt.clf()
-	plt.plot(history.history["f1"], label="Training")
-	plt.plot(history.history["val_f1"], label="Validation")
-	plt.legend()
-	plt.savefig('./out/model_gen_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+	# plt.clf()
+	# plt.plot(history.history["f1"], label="Training")
+	# plt.plot(history.history["val_f1"], label="Validation")
+	# plt.legend()
+	# plt.savefig('./out/model_gen_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
 	# plt.show()
 
@@ -86,7 +92,7 @@ if __name__ == '__main__':
 	from calibration import gen_f1_calib_graph, gen_f1_calib_models_graph
 
 	# MINIMAL CODE TO GENERATE SHAH GRAPH
-	# gen_shah_graph()
+	gen_shah_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
 	# gen_split_diff_models_graph()
@@ -95,4 +101,4 @@ if __name__ == '__main__':
 	# gen_f1_calib_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
-	gen_f1_calib_models_graph()
+	# gen_f1_calib_models_graph()
