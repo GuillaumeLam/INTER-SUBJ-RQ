@@ -2,12 +2,13 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
+from subject_wise_split import subject_wise_split
+
 import os
 import sys
 
 sys.path.append(os.getcwd())
 
-from util.subject_wise_split import subject_wise_split
 
 from models.metrics import f1
 
