@@ -32,7 +32,7 @@ def dataload(subject_wise, seed=42):
 
 	x_train, y_train, x_test, y_test, p_train, p_test = subject_wise_split(X, Y, participant=P, subject_wise=subject_wise,split=0.1,seed=seed)
 
-	x_train, y_train, x_val, y_val, p_train, p_val = subject_wise_split(x_train, y_train, participant=p_train, subject_wise=True,split=0.1,seed=seed)
+	# x_train, y_train, x_val, y_val, p_train, p_val = subject_wise_split(x_train, y_train, participant=p_train, subject_wise=True,split=0.1,seed=seed)
 
 	print('Generated train, val, and test sets')
 
@@ -43,9 +43,9 @@ def dataload(subject_wise, seed=42):
 	# print('Size overall set')
 	# print(X.shape)
 
-	return x_train, y_train, x_val, y_val, x_test, y_test, p_test
+	return x_train, y_train, x_test, y_test, p_test
 
-def gen_model(model, model_id, x_train, y_train, x_val, y_val):
+def gen_model(model, model_id, x_tr, y_tr, x_te, y_te):
 
 	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
 
@@ -53,9 +53,9 @@ def gen_model(model, model_id, x_train, y_train, x_val, y_val):
 
 	config = wandb.config
 
-	history = model.fit(x_train,y_train, epochs=config['epochs'],
+	history = model.fit(x_tr,y_tr, epochs=config['epochs'],
 				batch_size=config['batch_size'],
-				validation_data=(x_val,y_val),
+				validation_data=(x_te,y_te),
 				callbacks=[
 					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True),
 					WandbCallback()
@@ -92,10 +92,10 @@ if __name__ == '__main__':
 	from calibration import gen_f1_calib_graph, gen_f1_calib_models_graph
 
 	# MINIMAL CODE TO GENERATE SHAH GRAPH
-	gen_shah_graph()
+	# gen_shah_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
-	# gen_split_diff_models_graph()
+	gen_split_diff_models_graph()
 
 	# MINIMAL CODE TO GENERATE CALIBRATION GRAPH
 	# gen_f1_calib_graph()

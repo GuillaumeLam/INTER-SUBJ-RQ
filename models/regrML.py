@@ -6,6 +6,8 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, Dense, Flatten, Reshape, Dropout, BatchNormalization
 
+from tensorflow.keras.layers import Lambda
+
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, ZeroPadding2D
 from tensorflow.keras.layers import Conv2DTranspose, UpSampling2D, Cropping2D
 
@@ -13,286 +15,346 @@ from tensorflow.keras.utils import plot_model
 
 def REGR_model(model_id, in_shape=(101,5,6), out_shape=(9,), verbose=False):
 
-	model = Sequential()
-	
-	if model_id == 'CAE+DENSE':
-		# C1
-		model.add(Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+	if model_id == 'BiLinear':
+		inputs = Input(shape=in_shape)
+		conv1 = Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same')(inputs)
+		conv1 = MaxPooling2D(pool_size=(2,2), padding='same')(conv1)
+		conv1 = BatchNormalization(center=True, scale=True)(conv1)
+		conv1 = Dropout(0.5)(conv1)
 
-		# C2
-		model.add(Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+		conv2 = Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same')(conv1)
+		conv2 = MaxPooling2D(pool_size=(2,2), padding='same')(conv2)
+		conv2 = BatchNormalization(center=True, scale=True)(conv2)
+		conv2 = Dropout(0.5)(conv2)
 
-		#C3
-		model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+		conv3 = Conv2D(64, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same')(conv2)
+		conv3 = MaxPooling2D(pool_size=(2,2), padding='same')(conv3)
+		conv3 = BatchNormalization(center=True, scale=True)(conv3)
+		conv3 = Dropout(0.5)(conv3)
 
-		#C4
-		model.add(Conv2D(128, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		#D1
-		model.add(Conv2DTranspose(128, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
-
-		model.add(Conv2DTranspose(64, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
-
-		model.add(Conv2DTranspose(32, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
-
-		model.add(Conv2DTranspose(16, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
-
-		model.add(Conv2DTranspose(3, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(Flatten())
-		# model.add(Dense(functools.reduce(lambda a, b: a*b,out_shape)))
-		# model.add(Reshape(out_shape))
-
-	elif model_id in ['CAE_L_SYM','CAE_M', 'CAE_S']:
-		model.add(Input(shape=in_shape))
-
-		model.add(ZeroPadding2D(padding=((2,1),(1,0))))
-
-		# C1
-		model.add(Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		# C2
-		model.add(Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		#C3
-		model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		ch_out = 128
-
-		#C4
-		model.add(Conv2D(ch_out, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+		conv4 = Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same')(conv3)
+		conv4 = MaxPooling2D(pool_size=(2,2), padding='same')(conv4)
+		conv4 = BatchNormalization(center=True, scale=True)(conv4)
 		
-		ch_in = 128
+		d1 = Dropout(0.5)(conv4)
+		d2 = Dropout(0.5)(conv4)
+
+		x = Lambda(outer_product, name='outer_product')([d1,d2])
+
+		mlp = Dense(128)(x)
+		mlp = Dense(32)(mlp)
+
+		pred = Dense(out_shape[0], activation='softmax')(mlp)
+
+		model = Model(inputs=inputs, outputs=pred)
+
+	else:
+
+		model = Sequential()
+		
+		if model_id == 'CAE+DENSE':
+			# C1
+			model.add(Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			# C2
+			model.add(Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#C3
+			model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#C4
+			model.add(Conv2D(128, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#D1
+			model.add(Conv2DTranspose(128, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(64, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(32, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(16, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(3, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(Flatten())
+			# model.add(Dense(functools.reduce(lambda a, b: a*b,out_shape)))
+			# model.add(Reshape(out_shape))
+
+		elif model_id in ['CAE_L_SYM','CAE_M', 'CAE_S']:
+			model.add(Input(shape=in_shape))
+
+			model.add(ZeroPadding2D(padding=((2,1),(1,0))))
+
+			# C1
+			model.add(Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			# C2
+			model.add(Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#C3
+			model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			ch_out = 128
+
+			#C4
+			model.add(Conv2D(ch_out, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 			
-		if model_id == 'CAE_M':
-			latent = (7,1,128)
-			# latent_out = (26,2,16)
+			ch_in = 128
+				
+			if model_id == 'CAE_M':
+				latent = (7,1,128)
+				# latent_out = (26,2,16)
+
+				model.add(Flatten())
+				model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
+				# model.add(Dense(512))
+				model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
+				model.add(Reshape(latent))
+			
+			elif model_id == 'CAE_S':
+				latent = (7,1,128)
+				# latent_out = (26,2,16)
+
+				model.add(Flatten())
+				model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
+				model.add(Reshape(latent))
+
+			elif model_id == 'CAE_L_SYM':
+				model.add(Dense(ch_out))
+				model.add(Dense(1024))
+				model.add(Dense(4096))
+				model.add(Dense(1024))
+				model.add(Dense(ch_in))
+
+			#D1
+			model.add(Conv2DTranspose(ch_in, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(64, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(32, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(16, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(UpSampling2D(size=(2,2)))
+
+			model.add(Conv2DTranspose(3, kernel_size=(3,3), kernel_initializer='he_uniform', padding='same'))
+
+			model.add(Cropping2D(cropping=((6,5),(5,5))))
+			model.add(Flatten())
+
+		elif model_id in ['CNN_S','CNN_M','CNN_L']:
+			model.add(Input(shape=in_shape))
+
+			base_ch = 16
+
+			# C1
+			model.add(Conv2D(base_ch, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			# C2
+			model.add(Conv2D(base_ch*2, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#C3
+			model.add(Conv2D(base_ch*4, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
+
+			#C4
+			model.add(Conv2D(base_ch*16, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
 			model.add(Flatten())
-			model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
-			# model.add(Dense(512))
-			model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
-			model.add(Reshape(latent))
-		
-		elif model_id == 'CAE_S':
-			latent = (7,1,128)
-			# latent_out = (26,2,16)
+
+			if model_id == 'CNN_S':
+				model.add(Dense(1024))
+			elif model_id == 'CNN_M':
+				model.add(Dense(1024))
+				model.add(Dense(1024))
+			elif model_id == 'CNN_L':
+				model.add(Dense(2048))
+				model.add(Dense(1024))
+			
+			# model.add(Dense(functools.reduce(lambda a, b: a*b,out_shape)))
+			# model.add(Reshape(out_shape))
+			model.add(Flatten())
+
+		# simple FFN
+		elif model_id == 'FFN_flat':
+			
+			model.add(Input(shape=in_shape))
 
 			model.add(Flatten())
-			model.add(Dense(functools.reduce(lambda a, b: a*b, latent)))
-			model.add(Reshape(latent))
+			model.add(Dense(functools.reduce(lambda a, b: a*b, in_shape)))
 
-		elif model_id == 'CAE_L_SYM':
-			model.add(Dense(ch_out))
-			model.add(Dense(1024))
-			model.add(Dense(4096))
-			model.add(Dense(1024))
-			model.add(Dense(ch_in))
+			model.add(Dense(256))
 
-		#D1
-		model.add(Conv2DTranspose(ch_in, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
+			# model.add(Dense(functools.reduce(lambda a, b: a*b, out_shape)))
+			# model.add(Reshape(out_shape))
 
-		model.add(Conv2DTranspose(64, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
+		# ~size of CAE_L
+		elif model_id == 'FFN_rect':
 
-		model.add(Conv2DTranspose(32, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
+			model.add(Input(shape=in_shape))
 
-		model.add(Conv2DTranspose(16, kernel_size=(3,3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(UpSampling2D(size=(2,2)))
+			model.add(Flatten())
 
-		model.add(Conv2DTranspose(3, kernel_size=(3,3), kernel_initializer='he_uniform', padding='same'))
-
-		model.add(Cropping2D(cropping=((6,5),(5,5))))
-		model.add(Flatten())
-
-	elif model_id in ['CNN_S','CNN_M','CNN_L']:
-		model.add(Input(shape=in_shape))
-
-		base_ch = 16
-
-		# C1
-		model.add(Conv2D(base_ch, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		# C2
-		model.add(Conv2D(base_ch*2, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		#C3
-		model.add(Conv2D(base_ch*4, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		#C4
-		model.add(Conv2D(base_ch*16, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
-
-		model.add(Flatten())
-
-		if model_id == 'CNN_S':
-			model.add(Dense(1024))
-		elif model_id == 'CNN_M':
-			model.add(Dense(1024))
-			model.add(Dense(1024))
-		elif model_id == 'CNN_L':
 			model.add(Dense(2048))
-			model.add(Dense(1024))
-		
-		# model.add(Dense(functools.reduce(lambda a, b: a*b,out_shape)))
-		# model.add(Reshape(out_shape))
-		model.add(Flatten())
 
-	# simple FFN
-	elif model_id == 'FFN_flat':
-		
-		model.add(Input(shape=in_shape))
+			# model.add(Dense(functools.reduce(lambda a, b: a*b, out_shape)))
+			# model.add(Reshape(out_shape))
 
-		model.add(Flatten())
-		model.add(Dense(functools.reduce(lambda a, b: a*b, in_shape)))
+		elif model_id == 'Shah_FNN':
+			model.add(Input(shape=in_shape))
 
-		model.add(Dense(256))
+			model.add(Flatten())
+			model.add(Dense(606))
+			model.add(Dense(303))
+			model.add(Dense(606))
 
-		# model.add(Dense(functools.reduce(lambda a, b: a*b, out_shape)))
-		# model.add(Reshape(out_shape))
+		elif model_id == 'Shah_CNN':
+			model.add(Input(shape=in_shape))
 
-	# ~size of CAE_L
-	elif model_id == 'FFN_rect':
+			# C1
+			model.add(Conv2D(64, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		model.add(Input(shape=in_shape))
+			# C2
+			model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		model.add(Flatten())
+			#C3
+			model.add(Conv2D(256, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		model.add(Dense(2048))
+			model.add(Flatten())
 
-		# model.add(Dense(functools.reduce(lambda a, b: a*b, out_shape)))
-		# model.add(Reshape(out_shape))
+			model.add(Dense(256))
 
-	elif model_id == 'Shah_FNN':
-		model.add(Input(shape=in_shape))
+		elif model_id == 'Shah_CNN+':
+			model.add(Input(shape=in_shape))
 
-		model.add(Flatten())
-		model.add(Dense(606))
-		model.add(Dense(303))
-		model.add(Dense(606))
+			# C1
+			model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-	elif model_id == 'Shah_CNN':
-		model.add(Input(shape=in_shape))
+			# C2
+			model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C1
-		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			#C3
+			model.add(Conv2D(512, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C2
-		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			model.add(Flatten())
 
-		#C3
-		model.add(Conv2D(512, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			model.add(Dense(512))
+			model.add(Dense(256))
+			model.add(Dense(128))
 
-		model.add(Flatten())
+		elif model_id == 'Shah_CNNa':
+			model.add(Input(shape=in_shape))
 
-		model.add(Dense(256))
+			# C1
+			model.add(Conv2D(64, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-	elif model_id == 'Shah_CNN+':
-		model.add(Input(shape=in_shape))
+			# C2
+			model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C1
-		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			#C3
+			model.add(Conv2D(256, kernel_size=(3, 1), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 1), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C2
-		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			model.add(Flatten())
 
-		#C3
-		model.add(Conv2D(512, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			# model.add(Dense(512))
+			model.add(Dense(256))
+			model.add(Dense(128))
 
-		model.add(Flatten())
+		elif model_id == 'Shah_CNN-':
+			model.add(Input(shape=in_shape))
 
-		model.add(Dense(512))
-		model.add(Dense(256))
-		model.add(Dense(128))
+			# C1
+			model.add(Conv2D(16, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-	elif model_id == 'Shah_CNNa':
-		model.add(Input(shape=in_shape))
+			# C2
+			model.add(Conv2D(32, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C1
-		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			#C3
+			model.add(Conv2D(64, kernel_size=(3, 1), activation='relu', kernel_initializer='he_uniform', padding='same'))
+			model.add(MaxPooling2D(pool_size=(2, 1), padding='same'))
+			model.add(BatchNormalization(center=True, scale=True))
+			model.add(Dropout(0.5))
 
-		# C2
-		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			model.add(Flatten())
 
-		#C3
-		model.add(Conv2D(512, kernel_size=(3, 1), activation='relu', kernel_initializer='he_uniform', padding='same'))
-		model.add(MaxPooling2D(pool_size=(2, 1), padding='same'))
-		model.add(BatchNormalization(center=True, scale=True))
-		model.add(Dropout(0.5))
+			# model.add(Dense(512))
+			model.add(Dense(256))
+			model.add(Dense(128))
 
-		model.add(Flatten())
-
-		model.add(Dense(512))
-		model.add(Dense(256))
-		model.add(Dense(128))
-
-	# elif model_id == 'BiLinear':
-
-	model.add(Dense(out_shape[0], activation='softmax'))
+		model.add(Dense(out_shape[0], activation='softmax'))
 
 	verbose and model.summary()
 	# verbose and plot_model(model, to_file='AE-nw.png')
@@ -427,5 +489,5 @@ def outer_product(x):
     y_ssqrt = tf.multiply(tf.sign(phi_I),tf.sqrt(tf.abs(phi_I)+1e-12))
     
     # Apply l2 normalization
-    z_l2 = tf.nn.l2_normalize(y_ssqrt, dim=1)
+    z_l2 = tf.nn.l2_normalize(y_ssqrt)
     return z_l2
