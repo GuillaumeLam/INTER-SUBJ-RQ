@@ -236,7 +236,40 @@ def REGR_model(model_id, in_shape=(101,5,6), out_shape=(9,), verbose=False):
 
 		model.add(Dense(256))
 
-		# model.add(Dense(128))
+	elif model_id == 'Shah_CNN+':
+		model.add(Input(shape=in_shape))
+
+		# C1
+		model.add(Conv2D(128, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', input_shape=in_shape, padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		# C2
+		model.add(Conv2D(256, kernel_size=(3,3), activation='relu',kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2,2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		#C3
+		model.add(Conv2D(512, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		#C4
+		model.add(Conv2D(1024, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+		model.add(MaxPooling2D(pool_size=(2, 2), padding='same'))
+		model.add(BatchNormalization(center=True, scale=True))
+		model.add(Dropout(0.5))
+
+		model.add(Flatten())
+
+		model.add(Dense(512))
+		model.add(Dense(256))
+		model.add(Dense(128))
+
+	# elif model_id == 'BiLinear':
 
 	model.add(Dense(out_shape[0], activation='softmax'))
 
@@ -356,3 +389,22 @@ def REGR_pretrained_CNN(Ex,out_shape,save_path=None):
 			dense.summary(print_fn=lambda x: f.write(x + '\n'))
 
 	return CNN
+
+def outer_product(x):
+    #Einstein Notation  [batch,1,1,depth] x [batch,1,1,depth] -> [batch,depth,depth]
+    phi_I = tf.einsum('ijkm,ijkn->imn',x[0],x[1])
+    
+    # Reshape from [batch_size,depth,depth] to [batch_size, depth*depth]
+    phi_I = tf.reshape(phi_I,[-1,x[0].shape[3]*x[1].shape[3]])
+    
+    # Divide by feature map size [sizexsize]
+    size1 = int(x[1].shape[1])
+    size2 = int(x[1].shape[2])
+    phi_I = tf.divide(phi_I, size1*size2)
+    
+    # Take signed square root of phi_I
+    y_ssqrt = tf.multiply(tf.sign(phi_I),tf.sqrt(tf.abs(phi_I)+1e-12))
+    
+    # Apply l2 normalization
+    z_l2 = tf.nn.l2_normalize(y_ssqrt, dim=1)
+    return z_l2

@@ -17,6 +17,9 @@ oh2label = lambda one_hot: labels[np.argmax(one_hot)]
 epochs = 50
 batch_size = 2
 
+# epochs = 2
+# batch_size = 2048
+
 def dataload(subject_wise, seed=42):
 	X = np.load('dataset/GoIS_X_norm.npy', allow_pickle=True)
 	Y = np.load('dataset/GoIS_Y_norm.npy', allow_pickle=True)
@@ -37,20 +40,11 @@ def dataload(subject_wise, seed=42):
 
 	return x_train, y_train, x_val, y_val, x_test, y_test, p_test
 
-def gen_model(model, x_train, y_train, x_val, y_val):
+def gen_model(model, model_id, x_train, y_train, x_val, y_val):
 
 	model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy', f1])
 
 	print('Model Generated')
-
-	# print("CHECK: monitor val_loss or val_f1? (or else)")
-	# history = model.fit(x_train,y_train, epochs=epochs,
-	# 			batch_size=batch_size,
-	# 			validation_data=(x_val,y_val),
-	# 			callbacks=[
-	# 				tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
-	# 			]
-	# 			)
 
 	history = model.fit(x_train,y_train, epochs=epochs,
 				batch_size=batch_size,
@@ -60,16 +54,18 @@ def gen_model(model, x_train, y_train, x_val, y_val):
 				]
 				)
 
-	# plt.clf()
-	# plt.plot(history.history["loss"], label="Training Loss")
-	# plt.plot(history.history["val_loss"], label="Validation Loss")
-	# plt.legend()
-	# plt.show()
+	plt.clf()
+	plt.plot(history.history["loss"], label="Training")
+	plt.plot(history.history["val_loss"], label="Validation")
+	plt.legend()
+	plt.savefig('model_gen_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
-	# plt.clf()
-	# plt.plot(history.history["f1"], label="Training Loss")
-	# plt.plot(history.history["val_f1"], label="Validation Loss")
-	# plt.legend()
+	plt.clf()
+	plt.plot(history.history["f1"], label="Training")
+	plt.plot(history.history["val_f1"], label="Validation")
+	plt.legend()
+	plt.savefig('model_gen_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+
 	# plt.show()
 
 	return model
@@ -94,7 +90,7 @@ if __name__ == '__main__':
 	# gen_split_diff_models_graph()
 
 	# MINIMAL CODE TO GENERATE CALIBRATION GRAPH
-	gen_f1_calib_graph(detail=False)
+	# gen_f1_calib_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
-	# gen_f1_calib_models_graph()
+	gen_f1_calib_models_graph()

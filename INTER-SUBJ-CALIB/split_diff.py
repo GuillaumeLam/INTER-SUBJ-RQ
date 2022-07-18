@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 
-from main import dataload, gen_model, keras_model_cpy, labels
+from main import dataload, gen_model, keras_model_cpy, labels, epochs, batch_size
 
 import os
 import sys
@@ -21,8 +21,8 @@ from models.AE_CNN import AE_CNN
 # +++++++++++++++++++++++++++++++++++++++
 
 # model can either be a keras/tensorflow model or a function f where f(X_tr,Y_tr,X_ts,Y_ts)-> model/f^theta
-def get_f1_line(subject_wise, model_f):
-	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=subject_wise)
+def get_f1_line(subject_wise, model_f, seed=39):
+	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=subject_wise, seed=seed)
 
 	if callable(model_f):
 		model = model_f(x_train, y_train, x_val, y_val)
@@ -47,34 +47,37 @@ def get_f1_line(subject_wise, model_f):
 	return f1_line, model
 
 # NON-MOD
-def graph_split_diff(model, show_wait=False, eval_only=False):		
+def graph_split_diff(model, model_id, eval_only=False, seed=39):		
 	x = list(range(len(labels)))
 
 	if not eval_only:
-		f = lambda x_train, y_train, x_val, y_val: gen_model(keras_model_cpy(model), x_train, y_train, x_val, y_val)
+		f = lambda x_train, y_train, x_val, y_val: gen_model(keras_model_cpy(model), model_id, x_train, y_train, x_val, y_val)
 	else:
 		f = model
 
 	# add both to graph
-	sw_f1, sw_model = get_f1_line(subject_wise=True, model_f=f)
-	rw_f1, rw_model = get_f1_line(subject_wise=False, model_f=f)
+	sw_f1, sw_model = get_f1_line(subject_wise=True, model_f=f, seed=seed)
+	rw_f1, rw_model = get_f1_line(subject_wise=False, model_f=f, seed=seed)
 
-	if not show_wait:
-		plt.clf()
-		plt.xticks(x,labels)
-		# plt.plot(x, sw_f1, label='subject-wise')	
-		# plt.plot(x, rw_f1, label='record-wise')
+	# if # models & f1 lines stored, load them
 
-		plt.plot(sw_f1, label='subject-wise')	
-		plt.plot(rw_f1, label='record-wise')
-		plt.legend()
-		plt.show()
+	# if not show_wait:
+	plt.clf()
+	plt.xticks(x,labels)
+	# plt.plot(x, sw_f1, label='subject-wise')	
+	# plt.plot(x, rw_f1, label='record-wise')
+
+	plt.plot(sw_f1, label='subject-wise')	
+	plt.plot(rw_f1, label='record-wise')
+	plt.legend()
+	plt.savefig('./out/'+'sw_vs_rw_split_'+('eval_' if eval_only else '')+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+	# plt.show()
 
 	return sw_model, (sw_f1, rw_f1)
 
 def gen_shah_graph():
 	model = REGR_model('Shah_CNN', verbose=True)
-	graph_split_diff(model)
+	graph_split_diff(model, 'Shah_CNN')
 
 def gen_split_diff_models_graph():
 	# model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
@@ -84,14 +87,14 @@ def gen_split_diff_models_graph():
 
 	models = []
 
-	models.append(REGR_model('Shah_CNN', verbose=True))
-	models.append(REGR_model('Shah_FNN', verbose=True))
-	models.append(REGR_model('CNN_L', verbose=True))
+	models.append('Shah_CNN')
+	models.append('Shah_FNN')
+	models.append('CNN_L')
 	# models.append(AE_CNN(x_train, y_train))
 
 	# generate graphs of difference in f1 from splits for various model types
-	for model in models:
-		graph_split_diff(model)
+	for model_id in models:
+		graph_split_diff(REGR_model(model_id, verbose=True), model_id)
 
 
 if __name__ == '__main__':
@@ -101,6 +104,7 @@ if __name__ == '__main__':
 	# ================
 
 	# 1. grab you favorite keras/tensorflow model
-	model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
+	model_id = 'Shah_CNN'
+	model = REGR_model(model_id, x_train.shape[1:], y_train.shape[1:], verbose=True)
 	# 2. load model in graphing function
-	graph_split_diff(model)
+	graph_split_diff(model, model_id)

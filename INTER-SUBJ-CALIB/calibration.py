@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 
 import matplotlib.pyplot as plt
+from random import seed, randint
 from sklearn.metrics import classification_report
 
 from main import dataload, keras_model_cpy, labels, oh2label
@@ -19,6 +20,9 @@ sys.path.append(os.getcwd())
 from models.regrML import REGR_model
 from models.AE_CNN import AE_CNN
 
+
+upper = 100	
+x_axis = list(range(10,upper+10,10))
 
 # +++++++++++++++++++++++++++++++++++++++
 # 
@@ -113,7 +117,7 @@ def calibrate_sets(x_te, y_te, p_te, n_cycle_per_label=10, debug=False):
 	return calib, test
 
 # MOD: model
-def get_calib_line(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=4):
+def get_calib_point(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=4):
 	calib_set, test_set = calibrate_sets(x_test, y_test, p_test, n_cycle_per_label=n_cycle_per_label)
 
 	(x_calib, y_calib, p_calib), (x_calib_test, y_calib_test, p_calib_test) = calib_set, test_set	# keep P_{calib,test} for easy verification of split leak 
@@ -123,15 +127,21 @@ def get_calib_line(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_labe
 		batch_size=batch_size,
 		validation_data=(x_val,y_val),
 		callbacks=[
-			tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
+			tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True)
 		]
 	)
 
-	# plt.clf()
-	# plt.plot(history.history["f1"], label="Training Loss")
-	# plt.plot(history.history["val_f1"], label="Validation Loss")
-	# plt.legend()
-	# plt.show()
+	plt.clf()
+	plt.plot(history.history["loss"], label="Training")
+	plt.plot(history.history["val_loss"], label="Validation")
+	plt.legend()
+	plt.savefig('calib_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+
+	plt.clf()
+	plt.plot(history.history["f1"], label="Training")
+	plt.plot(history.history["val_f1"], label="Validation")
+	plt.legend()
+	plt.savefig('calib_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
 
 	mult_pred = model.predict(x_calib_test)
 
@@ -147,39 +157,23 @@ def get_calib_line(model, x_test, y_test, p_test, x_val, y_val, n_cycle_per_labe
 
 	return calib_f1
 
-# if detail=True: generate graphs of f1 for all labels, else: generate graph of overall f1 of labels
-# MOD: model
-def graph_f1_calib(model, detail=True):
+def get_calib_line(model, model_id, seed=39):
 	######################################
-	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=True, seed=39)
+	sw_model, (sw_f1, rw_f1) = graph_split_diff(model, model_id, seed=seed)
 
-	upper = 100
-	# upper = 50
-	x_axis = list(range(10,upper+10,10))
+	label_f1 = []
+	for _ in range(len(labels)):
+		label_f1.append([])
 
-	plt.clf()
-	
-	sw_model, (sw_f1, rw_f1) = graph_split_diff(model, show_wait=True)
-
-	if detail:
-		label_f1 = []
-		for _ in range(len(labels)):
-			label_f1.append([])
-	else:
-		avg_f1 = []
-		std_f1 = []
+	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=True, seed=seed)
 
 	for n in x_axis:
 		model_cpy = keras_model_cpy(sw_model)
 		params_cpy = model_cpy, x_test, y_test, p_test, x_val, y_val
-		calib_f1_n = get_calib_line(model_cpy, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=n)
+		calib_f1_n = get_calib_point(model_cpy, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=n)
 
-		if detail:
-			for i, l_f1 in enumerate(calib_f1_n):
-				label_f1[i].append(l_f1)
-		else:
-			avg_f1.append(np.mean(np.array(calib_f1_n)))
-			std_f1.append(np.std(np.array(calib_f1_n)))
+		for i, l_f1 in enumerate(calib_f1_n):
+			label_f1[i].append(l_f1)
 
 	######################################
 	# repeat on diff seeds for std
@@ -187,42 +181,54 @@ def graph_f1_calib(model, detail=True):
 	# -> returns 9x10, repeat n times: nx9x10
 	######################################
 
+	return label_f1, sw_f1, rw_f1, model_cpy
+
+
+def get_f1_calib(label_f1, sw_f1, rw_f1, detail, model_id):
+
 	# given: 
 	# - (r/s)w_f1 w/ shape: 9xn
 	# - label_f1 w/ shape: 9xnx10
 
+	# print('SHOWING SHAPES')
+	# print('label_f1')
+	# print(label_f1.shape)
+	# print('(r/s)w_f1')
+	# print(rw_f1.shape)
+	# print(sw_f1.shape)
+
 	plt.clf()
 	if detail:
-		# sw_avg_f1 = np.mean(sw_f1, axis=1)
-		# rw_avg_f1 = np.mean(rw_f1, axis=1)
-		# sw_std_f1 = np.std(sw_f1, axis=1)
-		# rw_std_f1 = np.std(rw_f1, axis=1)
+		sw_avg_f1 = np.mean(sw_f1, axis=1)
+		rw_avg_f1 = np.mean(rw_f1, axis=1)
+		sw_std_f1 = np.std(sw_f1, axis=1)
+		rw_std_f1 = np.std(rw_f1, axis=1)
 		
 		for i, l in enumerate(label_f1):
-			# avg_calib_f1 = np.mean(l, axis=0)
-			# std_calib_f1 = np.std(l, axis=0)
+			avg_calib_f1 = np.mean(l, axis=0)
+			std_calib_f1 = np.std(l, axis=0)
 
 			plt.subplot(3,3,i+1)
 
-			plt.plot(x_axis, l)
-			# plt.plot(x_axis, avg_calib_f1)
-			# plt.fill_between(
-			# 	x_axis,
-			# 	avg_calib_f1-std_calib_f1,
-			# 	avg_calib_f1+std_calib_f1, 
-			# 	alpha=0.4
-			# )
+			# plt.plot(x_axis, l)
+			plt.plot(x_axis, avg_calib_f1)
+			plt.fill_between(
+				x_axis,
+				avg_calib_f1-std_calib_f1,
+				avg_calib_f1+std_calib_f1, 
+				alpha=0.4
+			)
 
 			plt.xlabel('Calibration size')
 			plt.ylabel('F1')
 			plt.title(labels[i])
 			
-			plt.plot(0, sw_f1[i], 'ro',label='subject-wise')
-			plt.plot(upper, rw_f1[i], 'go', label='random-wise')
-			# plt.plot(0, sw_avg_f1[i], 'ro',label='subject-wise')
-			# plt.plot(upper, rw_avg_f1[i], 'go', label='random-wise')
-			# plt.errorbar(0, sw_avg_f1[i], yerr=sw_std_f1[i])
-			# plt.errorbar(upper, rw_avg_f1[i], yerr=rw_std_f1[i])
+			# plt.plot(0, sw_f1[i], 'ro',label='subject-wise')
+			# plt.plot(upper, rw_f1[i], 'go', label='random-wise')
+			plt.plot(0, sw_avg_f1[i], 'ro',label='subject-wise')
+			plt.plot(upper, rw_avg_f1[i], 'go', label='random-wise')
+			plt.errorbar(0, sw_avg_f1[i], yerr=sw_std_f1[i])
+			plt.errorbar(upper, rw_avg_f1[i], yerr=rw_std_f1[i])
 
 			plt.legend()
 			plt.grid(linestyle='--', linewidth=0.5)
@@ -230,20 +236,13 @@ def graph_f1_calib(model, detail=True):
 		plt.suptitle('F1 vs calibration size for surface types')
 			
 	else:
-		avg_calib_f1=np.array(avg_f1)
-		std_calib_f1=np.array(std_f1)
+		label_f1 = np.array(label_f1)
+		avg_calib_f1 = np.mean(label_f1, axis=(0,1))
+		std_calib_f1 = np.std(label_f1, axis=(0,1))
 
-		sw_f1 = np.array(sw_f1)
-		rw_f1 = np.array(rw_f1)
+		sw_f1 = np.mean(sw_f1, axis=1)
+		rw_f1 = np.mean(rw_f1, axis=1)
 
-		# label_f1 = np.array(label_f1)
-		# avg_calib_f1 = np.mean(label_f1, axis=(0,1))
-		# std_calib_f1 = np.std(label_f1, axis=(0,1))
-
-		# sw_f1 = np.mean(sw_f1, axis=1)
-		# rw_f1 = np.mean(rw_f1, axis=1)
-
-		# display scaling of f1 => plt.plot(x_axis, avg_f1)
 		plt.plot(x_axis, avg_calib_f1)
 		plt.fill_between(
 			x_axis,
@@ -263,30 +262,60 @@ def graph_f1_calib(model, detail=True):
 		plt.ylabel('F1')
 		plt.title('F1 vs calibration size for surface types')
 
-	plt.show()
+	title = 'f1_vs_calib_size_per_label_'+('detail_' if detail else '')
+	plt.savefig('./out/'+title+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
+
+# if detail=True: generate graphs of f1 for all labels, else: generate graph of overall f1 of labels
+# MOD: model
+def graph_f1_calib(model, model_id, cv=1):
+	seed(39)
+
+	seeds = [randint(0,1000) for _ in range(0,cv)]
+
+	label_f1 = np.empty((0,9,10))
+	sw_f1 = np.empty((0,9))
+	rw_f1 = np.empty((0,9))
+
+	for i,s in enumerate(seeds):
+		l, sw, rw, model_cpy = get_calib_line(model, model_id, seed=s)
+
+		label_f1 = np.append(label_f1, [l], axis=0)
+		sw_f1 = np.append(sw_f1, [sw], axis=0)
+		rw_f1 = np.append(rw_f1, [rw], axis=0)
+		print('DONE 1 CV fold, progress: '+str(i*100/len(seeds))+'%')
+
+	label_f1.transpose(1,0,2)
+	sw_f1.transpose(1,0)
+	rw_f1.transpose(1,0)
+
+	# given: 
+	# - (r/s)w_f1 w/ shape: 9xn
+	# - label_f1 w/ shape: 9xnx10	
+
+	get_f1_calib(copy.deepcopy(label_f1), copy.deepcopy(sw_f1), copy.deepcopy(rw_f1), detail=True, model_id=model_id)
+	get_f1_calib(copy.deepcopy(label_f1), copy.deepcopy(sw_f1), copy.deepcopy(rw_f1), detail=False, model_id=model_id)
 
 	return model_cpy # returned last calibrated model
 
-def gen_f1_calib_graph(detail=True):
-	model = REGR_model('Shah_CNN', verbose=True)
-	graph_f1_calib(model, detail)
+def gen_f1_calib_graph():
+	model_id = 'Shah_CNN'
+	model = REGR_model(model_id, verbose=True)
+	graph_f1_calib(model, model_id)
 
 def gen_f1_calib_models_graph():
-	# model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	# model = REGR_model('Shah_FNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	# model = REGR_model('CNN_L', x_train.shape[1:], y_train.shape[1:], verbose=True)
-	# model = AE_CNN(x_train, y_train)
 
 	models = []
 
-	models.append(REGR_model('Shah_CNN', verbose=True))
-	models.append(REGR_model('Shah_FNN', verbose=True))
-	models.append(REGR_model('CNN_L', verbose=True))
+	models.append('Shah_CNN+')
+	models.append('Shah_CNN')
+	models.append('Shah_FNN')
+	models.append('CNN_L')
+	# models.append('BiLinear')
 	# models.append(AE_CNN(x_train, y_train))
 
 	# generate graphs of difference in f1 from splits for various model types
-	for model in models:
-		graph_f1_calib(model)
+	for model_id in models:
+		graph_f1_calib(REGR_model(model_id, verbose=True), model_id, cv=10)
 
 if __name__ == '__main__':
 	# ================
@@ -295,9 +324,9 @@ if __name__ == '__main__':
 	# ================
 
 	# 1. grab you favorite keras/tensorflow model
-	model = REGR_model('Shah_CNN', x_train.shape[1:], y_train.shape[1:], verbose=True)
+	model_id = 'Shah_CNN'
 	# 2. load model in graphing function
-	calib_model = graph_f1_calib(model)
+	calib_model = graph_f1_calib(REGR_model(model_id, verbose=True), model_id)
 
 	# (3.) sanity check: verify prediction of model
 	# note: calib_model will be model which has been trained with the highest n_cycles_per_label
