@@ -123,7 +123,7 @@ def calib_data(cv=1):
 
 	return label_f1.transpose(1,0,2), sw_f1.transpose(1,0), rw_f1.transpose(1,0), np.array(calib_sizes)
 
-def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id):
+def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id, log_scale=False):
 
 	# given: 
 	# - (r/s)w_f1 w/ shape: 9xf
@@ -184,6 +184,8 @@ def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id):
 			plt.errorbar(calib_sizes[-1], rw_avg_f1[i], yerr=rw_std_f1[i], ecolor='red')
 
 			plt.grid(linestyle='--', linewidth=0.5)
+			if log_scale:
+				plt.xscale('symlog')
 
 		plt.figlegend()
 		plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -213,10 +215,12 @@ def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id):
 		plt.legend(loc='lower right')
 		plt.grid(linestyle='--', linewidth=0.5)
 		plt.xlabel('Calibration size')
+		if log_scale:
+			plt.xscale('symlog')
 		plt.ylabel('F1')
 		plt.title('F1 vs calibration size for surface types')
 
 	title = 'f1_vs_calib_size_per_label_'+('detail_' if detail else '')
 	epochs=50
 	batch_size=16
-	plt.savefig('./out/'+title+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cv='+str(cv)+')')
+	plt.savefig('./out/'+title+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cv='+str(cv)+',log='+str(log_scale)+')')
