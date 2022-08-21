@@ -65,7 +65,7 @@ def get_calib_point(model, X_test, Y_test, P_test, seed, calib_split):
 	return calib_f1, x_calib.shape[0]
 
 # x_axis = [e*0.1 for e in list(range(0,10,1))]
-x_axis = [0.0, 0.01, 0.03, 0.05, 0.07, 0.09, 0.1, 0.2, 0.3, 0.5]
+x_axis = [0.0, 0.001, 0.003, 0.005, 0.007, 0.009, 0.01, 0.03, 0.05, 0.07, 0.09, 0.1, 0.2, 0.3, 0.5]
 
 def calibrated_line(model, X_test, Y_test, P_test, seed):
 	label_f1 = []

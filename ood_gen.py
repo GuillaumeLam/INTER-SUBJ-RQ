@@ -116,11 +116,16 @@ def irm_loss(model, env, penalty_weight):
 
     return error + penalty_weight * penalty, [l.item() for l in losses]
 
+def no_ood_gen_loss(model, env, penalty_weight):
+    losses = [bce_xy(model, x_e, y_e).mean() for x_e, y_e in env]
+    return torch.stack(losses).sum()/len(env), [l.item() for l in losses]
+
 
 loss_fcts = {
     "REx": rex_loss,
     "IRM": irm_loss,
     "ERM": erm_loss,
+    # "STND": no_ood_gen_loss,
     }
 
 # envs = env_split(X, Y, P)
