@@ -20,7 +20,7 @@ labels = np.load('dataset/labels.npy', allow_pickle=True)
 oh2label = lambda one_hot: labels[np.argmax(one_hot)]
 
 epochs = 50
-batch_size = 4
+batch_size = 2
 
 # epochs = 2
 # batch_size = 2048
@@ -51,13 +51,21 @@ def gen_model(model, model_id, x_tr, y_tr, x_te, y_te):
 
 	print('Model Generated')
 
+	wandb.config = {
+		'epochs': epochs,
+		'batch_size': batch_size,
+		'model_id': model_id
+	}
+
 	config = wandb.config
+
+	# take out early stopping?, simply track time for one epoch, mult by # of epochs, is one job / wandb run
 
 	history = model.fit(x_tr,y_tr, epochs=config['epochs'],
 				batch_size=config['batch_size'],
 				validation_data=(x_te,y_te),
 				callbacks=[
-					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True),
+					tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=7, mode="max", restore_best_weights=True),
 					WandbCallback()
 				]
 				)
@@ -95,10 +103,10 @@ if __name__ == '__main__':
 	# gen_shah_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
-	gen_split_diff_models_graph()
+	# gen_split_diff_models_graph()
 
 	# MINIMAL CODE TO GENERATE CALIBRATION GRAPH
-	# gen_f1_calib_graph()
+	gen_f1_calib_graph()
 
 	# # MINIMAL CODE TO GENERATE SPLIT DIFFERENCE GRAPH FOR ALL MODELS 
 	# gen_f1_calib_models_graph()

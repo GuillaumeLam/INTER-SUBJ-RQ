@@ -60,10 +60,7 @@ def graph_split_diff(model, model_id, eval_only=False, cv=1):
 	if not eval_only:
 		f = lambda x_tr, y_tr, x_te, y_te: gen_model(keras_model_cpy(model), model_id, x_tr, y_tr, x_te, y_te)
 	else:
-		f = model
-
-	# add both to graph
-	
+		f = model	
 
 	cv_fold = []
 
@@ -91,13 +88,13 @@ def graph_split_diff(model, model_id, eval_only=False, cv=1):
 		rw_f1, rw_model = get_f1_line(subject_wise=False, model_f=f, seed=seeds[i])
 		if i==0:
 			run.finish()
-		cv_fold.append((sw_f1, sw_model, rw_f1, rw_model))
+		cv_fold.append((sw_f1, rw_f1))
 
 	sw_f1 = np.array([i[0] for i in cv_fold])
 	avg_sw_f1 = np.mean(sw_f1, axis=0)
 	std_sw_f1 = np.std(sw_f1, axis=0)
 	
-	rw_f1 = np.array([i[2] for i in cv_fold])
+	rw_f1 = np.array([i[1] for i in cv_fold])
 	avg_rw_f1 = np.mean(rw_f1, axis=0)
 	std_rw_f1 = np.std(rw_f1, axis=0)
 
@@ -123,7 +120,7 @@ def graph_split_diff(model, model_id, eval_only=False, cv=1):
 	plt.legend()
 	plt.savefig('./out/'+'sw_vs_rw_split_'+('eval_' if eval_only else '')+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+')')
 
-	return sw_model, (sw_f1, rw_f1)
+	return sw_model, (np.mean(sw_f1, axis=0), np.mean(rw_f1, axis=0))
 
 def gen_shah_graph():
 	model = REGR_model('Shah_CNN', verbose=True)
@@ -137,9 +134,9 @@ def gen_split_diff_models_graph():
 
 	models = []
 
-	models.append('BiLinear')
+	# models.append('Shah_CNN-')
+	# models.append('BiLinear')
 	models.append('Shah_CNNa')
-	models.append('Shah_CNN-')
 	models.append('Shah_CNN+')
 	models.append('Shah_CNN')
 	models.append('Shah_FNN')
@@ -148,7 +145,7 @@ def gen_split_diff_models_graph():
 
 	# generate graphs of difference in f1 from splits for various model types
 	for model_id in models:
-		graph_split_diff(REGR_model(model_id, verbose=True), model_id, cv=7)
+		graph_split_diff(REGR_model(model_id, verbose=True), model_id, cv=1)
 
 
 if __name__ == '__main__':

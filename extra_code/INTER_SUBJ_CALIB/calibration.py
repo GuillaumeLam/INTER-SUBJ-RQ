@@ -2,6 +2,9 @@ import copy
 import tensorflow as tf
 import numpy as np
 
+import wandb
+from wandb.keras import WandbCallback
+
 import matplotlib.pyplot as plt
 from random import seed, randint
 from sklearn.metrics import classification_report
@@ -20,6 +23,7 @@ sys.path.append(os.getcwd())
 from models.regrML import REGR_model
 from models.AE_CNN import AE_CNN
 
+wandb.init(project='inter-subject-calibration', entity='guillaumelam')
 
 upper = 100	
 x_axis = list(range(10,upper+10,10))
@@ -117,31 +121,43 @@ def calibrate_sets(x_te, y_te, p_te, n_cycle_per_label=10, debug=False):
 	return calib, test
 
 # MOD: model
-def get_calib_point(model, model_id, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=4):
+def get_calib_point(model, model_id, x_test, y_test, p_test, n_cycle_per_label=4):
 	calib_set, test_set = calibrate_sets(x_test, y_test, p_test, n_cycle_per_label=n_cycle_per_label)
 
-	(x_calib, y_calib, p_calib), (x_calib_test, y_calib_test, p_calib_test) = calib_set, test_set	# keep P_{calib,test} for easy verification of split leak 
-																									# -> len(P_calib)*len(P_test)~O(N)^2; need to compare every elem of array with other array
+	(x_calib, y_calib, _), (x_calib_test, y_calib_test, _) = calib_set, test_set	# keep P_{calib,test} for easy verification of split leak 
+																									# -> len(P_calib)*len(P_test)~O(N)^2; need to compare every elem of array with other array																							
+	
+	run=wandb.init(project='inter-subject-calibration', entity='guillaumelam')
+	wandb.run.name = 'calib_'+model_id+'-e='+str(epochs)+'-bs='+str(batch_size)+'-cs='+str(n_cycle_per_label)
+	wandb.config = {
+		'epochs': 50,
+		'batch_size': 2,
+		'model_id': model_id,
+		'calibration_size': n_cycle_per_label
+	}
+	config = wandb.config
 
-	history = model.fit(x_calib,y_calib, epochs=epochs,
-		batch_size=batch_size,
-		validation_data=(x_val,y_val),
+	history = model.fit(x_calib,y_calib, epochs=config['epochs'],
+		batch_size=config['batch_size'],
+		validation_data=(x_calib_test,y_calib_test),
 		callbacks=[
 			tf.keras.callbacks.EarlyStopping(monitor="val_f1", patience=5, mode="max",restore_best_weights=True)
 		]
 	)
 
-	plt.clf()
-	plt.plot(history.history["loss"], label="Training")
-	plt.plot(history.history["val_loss"], label="Validation")
-	plt.legend()
-	plt.savefig('./out/calib_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+	run.finish()
 
-	plt.clf()
-	plt.plot(history.history["f1"], label="Training")
-	plt.plot(history.history["val_f1"], label="Validation")
-	plt.legend()
-	plt.savefig('./out/calib_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+	# plt.clf()
+	# plt.plot(history.history["loss"], label="Training")
+	# plt.plot(history.history["val_loss"], label="Validation")
+	# plt.legend()
+	# plt.savefig('./out/calib_loss_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
+
+	# plt.clf()
+	# plt.plot(history.history["f1"], label="Training")
+	# plt.plot(history.history["val_f1"], label="Validation")
+	# plt.legend()
+	# plt.savefig('./out/calib_f1_'+'('+model_id+',e='+str(epochs)+',bs='+str(batch_size)+',cs='+str(n_cycle_per_label)+')')
 
 	mult_pred = model.predict(x_calib_test)
 
@@ -159,18 +175,20 @@ def get_calib_point(model, model_id, x_test, y_test, p_test, x_val, y_val, n_cyc
 
 def get_calib_line(model, model_id, seed=39):
 	######################################
-	sw_model, (sw_f1, rw_f1) = graph_split_diff(model, model_id, seed=seed)
+	sw_model, (sw_f1, rw_f1) = graph_split_diff(model, model_id, cv=3)
+	# load .h5 model from wandb
+	# keras.loadmodel(model_id+'.h5')
 
 	label_f1 = []
 	for _ in range(len(labels)):
 		label_f1.append([])
 
-	x_train, y_train, x_val, y_val, x_test, y_test, p_test = dataload(subject_wise=True, seed=seed)
+	x_train, y_train, x_test, y_test, p_test = dataload(subject_wise=True, seed=seed)
 
 	for n in x_axis:
 		model_cpy = keras_model_cpy(sw_model)
-		params_cpy = model_cpy, x_test, y_test, p_test, x_val, y_val
-		calib_f1_n = get_calib_point(model_cpy, model_id, x_test, y_test, p_test, x_val, y_val, n_cycle_per_label=n)
+		params_cpy = model_cpy, x_test, y_test, p_test
+		calib_f1_n = get_calib_point(model_cpy, model_id, x_test, y_test, p_test, n_cycle_per_label=n)
 
 		for i, l_f1 in enumerate(calib_f1_n):
 			label_f1[i].append(l_f1)
@@ -298,9 +316,9 @@ def graph_f1_calib(model, model_id, cv=1):
 	return model_cpy # returned last calibrated model
 
 def gen_f1_calib_graph():
-	model_id = 'Shah_CNN'
+	model_id = 'Shah_CNN+'
 	model = REGR_model(model_id, verbose=True)
-	graph_f1_calib(model, model_id)
+	graph_f1_calib(model, model_id, cv=7)
 
 def gen_f1_calib_models_graph():
 
@@ -316,7 +334,7 @@ def gen_f1_calib_models_graph():
 
 	# generate graphs of difference in f1 from splits for various model types
 	for model_id in models:
-		graph_f1_calib(REGR_model(model_id, verbose=True), model_id, cv=10)
+		graph_f1_calib(REGR_model(model_id, verbose=True), model_id, cv=7)
 
 if __name__ == '__main__':
 	# ================

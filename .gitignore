@@ -133,4 +133,16 @@ dataset/data.mat
 dataset/py_compatible_data.mat
 dataset/*.npy
 
+dataset/cycle1_with_wrist_Normalized.pkl
+cycle1_with_wrist_Normalized.pkl
+
+wandb/*
+extra_code/wandb/*
+
 out/*
+
+extra_code/dataset/data.mat
+extra_code/dataset/py_compatible_data.mat
+extra_code/dataset/*.npy
+
+extra_code/INTER_SUBJ_CALIB/.\\LDA9Surface\\Magnitude_sepratedLDA_15%_32_606n.pkl
