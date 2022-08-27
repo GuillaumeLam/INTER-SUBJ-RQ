@@ -5,42 +5,42 @@ import matplotlib.pyplot as plt
 from torch.autograd import grad
 import torch.nn.functional as f
 
+from sklearn.decomposition import PCA
+
 from sklearn.metrics import f1_score, accuracy_score
 
 class Net(nn.Module):
-    def __init__(self, larger=False):
+    def __init__(self, size):
         super(Net, self).__init__()
 
         self.layers = nn.ModuleList([])
 
-        self.layers.append(nn.Linear(480, 606))
-        if larger:
+        if size == 'large':
             print('more capacity model')
             # seems like too much capacity for IRM leads to plateau-ing lower
             # it would get stuck at ~30%, while less capacity model settles at ~70%
             # self.layers.append(nn.Linear(606, 909))
             # self.layers.append(nn.Linear(909, 1024))
             # self.layers.append(nn.Linear(1024, 606))
-            self.layers.append(nn.Linear(606, 909))
+            self.layers.append(nn.Linear(480, 909))
             self.layers.append(nn.Linear(909, 606))
+            self.layers.append(nn.Linear(606, 909))
+            self.layers.append(nn.Linear(909, 9))
             
-        else:
+        elif size == 'standard':
             print('less capacity model')
+            self.layers.append(nn.Linear(480, 606))
             self.layers.append(nn.Linear(606, 303))
             self.layers.append(nn.Linear(303, 606))
-        self.layers.append(nn.Linear(606, 9))
+            self.layers.append(nn.Linear(606, 9))
 
-        # for l in self.layers:
-        #     l.weight.data.fill_(1.1)
-        #     l.bias.data.fill_(1.1)
+        elif size == 'small':
+            self.layers.append(nn.Linear(480, 404))
+            self.layers.append(nn.Linear(404, 202))
+            self.layers.append(nn.Linear(202, 404))
+            self.layers.append(nn.Linear(404, 9))
 
     def forward(self, x):
-        # x = f.relu(self.fc1(x))
-        # x = f.relu(self.fc2(x))
-        # x = f.relu(self.fc3(x))
-        # # x = f.softmax(self.fc4(x), dim=0)
-        # x = self.fc4(x)
-
         for i, l in enumerate(self.layers):
             if not i == len(self.layers)-1:
                 x = f.relu(l(x))
@@ -116,16 +116,11 @@ def irm_loss(model, env, penalty_weight):
 
     return error + penalty_weight * penalty, [l.item() for l in losses]
 
-def no_ood_gen_loss(model, env, penalty_weight):
-    losses = [bce_xy(model, x_e, y_e).mean() for x_e, y_e in env]
-    return torch.stack(losses).sum()/len(env), [l.item() for l in losses]
-
 
 loss_fcts = {
     "REx": rex_loss,
     "IRM": irm_loss,
     "ERM": erm_loss,
-    # "STND": no_ood_gen_loss,
     }
 
 # envs = env_split(X, Y, P)
@@ -142,27 +137,32 @@ def env_split(X, Y, P):
     return [(torch.tensor(x_e, requires_grad=True), torch.tensor(y_e)) for x_e, y_e in list(env.values())]
 
 def eval(model, env):
-    loss = []
+    # loss = []
     f1 = []
     acc = []
 
     for x_e, y_e in env:
-        l = bce_xy(model, x_e, y_e).mean()
+        # l = bce_xy(model, x_e, y_e).mean()
 
         y_h = model(x_e)
 
         f = f1_score(np.argmax(y_h.detach(), axis=1), np.argmax(y_e.detach(), axis=1), average='weighted')
         a = accuracy_score(np.argmax(y_h.detach(), axis=1), np.argmax(y_e.detach(), axis=1))
 
-        loss.append(l)
+        # loss.append(l)
         f1.append(f)
         acc.append(a)
 
-    return torch.tensor(loss).mean(), torch.tensor(f1).mean(), torch.tensor(acc).mean()
+    return torch.tensor(f1).mean(), torch.tensor(acc).mean()
 
-def inter_subj_ood(e_tr, e_te, epochs=50):
+def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epochs=50, lr=0.001, penalty_weight_factor=1.6):
+    torch.manual_seed(seed)
 
-    run_methods = ["REx", "IRM", "ERM"]
+    print('SETTINGS Epoch:'+str(epochs)+', Learning Rate:'+str(lr)+', Penalty Weight Factor:'+str(penalty_weight_factor)+', Model Size:'+model_size)
+
+    # run_methods = ["REx", "IRM", "ERM"]
+    run_methods = [run_method]
+    metrics = ['risk', 'loss', 'f1', 'acc']
 
     models = []
 
@@ -170,55 +170,227 @@ def inter_subj_ood(e_tr, e_te, epochs=50):
     ys = []
     zs = []
 
+    inter_subj_gap = {}
+
+    for m in run_methods:
+        inter_subj_gap[m] = {}
+
+    for m in metrics:
+        for rm in run_methods:
+            inter_subj_gap[rm][m] = ([],[],[]) # [0] for train metric, [1] for test metric, [2] for gap (train-test)
+            # inter_subj_gap['IRM'][m] = ([],[],[])
+            # inter_subj_gap['ERM'][m] = ([],[],[])
+
     for method in run_methods:
         print('Running model: '+method)
 
-        if method in ['IRM', 'REx']:
-            model = Net(True).double()
-        else:
-            model = Net().double()
+        # if method in ['IRM', 'REx']:
+        #     model = Net(True).double()
+        # else:
+        #     model = Net().double()
+        model = Net(model_size).double()
 
-        optimizer = optim.Adam(model.parameters(), lr=0.001) # match optimizer?
+        optimizer = optim.Adam(model.parameters(), lr=lr)
         loss_fct = loss_fcts[method]
 
         for step in range(epochs):
 
-            if method == 'IRM':
-                # penalty_weight = step+1
-                # penalty_weight = (step+1)**1.2
-                penalty_weight = (step+1)**1.6
-            elif method == 'REx':
-                penalty_weight = step**2
-            else:
-                penalty_weight = 0
+            # TRAIN
+            penalty_weight = step**penalty_weight_factor
 
-            loss, z = loss_fct(model, e_tr, penalty_weight=penalty_weight)
+            model.train()
+
+            risk, z = loss_fct(model, e_tr, penalty_weight=penalty_weight)
 
             zs.extend(z)
             xs.extend(list(range(len(z))))
             ys.extend([step]*len(z))
 
             optimizer.zero_grad()
-            loss.backward()
+            risk.backward()
             optimizer.step()
 
-            _, f1, acc = eval(model, e_tr)
-            print('Epoch: '+ str(step)+', Loss: '+str(loss.item())+', F1: '+str(f1.item())+', Acc: '+str(acc.item()))
+            f1, acc = eval(model, e_tr)
+            print('Epoch: '+ str(step))
+            print('Risk: '+str(risk.item())+',      Loss: '+str(np.array(z).mean())+',      F1: '+str(f1.item())+',      Acc: '+str(acc.item()))
 
-        model.eval()
-        test_loss, test_f1, test_acc = eval(model, e_te)
+            # TEST
+            model.eval()
 
-        print('Test loss: '+ str(test_loss.item()))
-        print('Test F1: '+ str(test_f1.item()))
-        print('Test Acc: '+ str(test_acc.item()))
+            test_risk, test_z = loss_fct(model, e_te, penalty_weight=penalty_weight)
+
+            test_f1, test_acc = eval(model, e_te)
+
+            print('Test Risk: '+str(test_risk.item())+', Test Loss: '+str(np.array(test_z).mean())+', Test F1: '+str(test_f1.item())+', Test Acc: '+str(test_acc.item()))
+
+            inter_subj_gap[method]['risk'][0].append(risk.item())
+            inter_subj_gap[method]['risk'][1].append(test_risk.item())
+            inter_subj_gap[method]['risk'][2].append(risk.item()-test_risk.item())
+
+            inter_subj_gap[method]['loss'][0].append(np.array(z).mean())
+            inter_subj_gap[method]['loss'][1].append(np.array(test_z).mean())
+            inter_subj_gap[method]['loss'][2].append(np.array(z).mean()-np.array(test_z).mean())
+
+            inter_subj_gap[method]['f1'][0].append(f1.item())
+            inter_subj_gap[method]['f1'][1].append(test_f1.item())
+            inter_subj_gap[method]['f1'][2].append(f1.item()-test_f1.item())
+
+            inter_subj_gap[method]['acc'][0].append(acc.item())
+            inter_subj_gap[method]['acc'][1].append(test_acc.item())
+            inter_subj_gap[method]['acc'][2].append(acc.item()-test_acc.item())
 
         models.append(model)
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(ys,xs,zs)
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Environment ie. patient')
+        ax.set_zlabel('Risk')
         plt.show()
 
         print('+'*30)
 
-    return models
+    return models, inter_subj_gap
+
+def wrap(seed, run_method, config):
+    X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(seed, True)
+
+    e_tr = env_split(X_tr, Y_tr, P_tr)
+    e_te = env_split(X_te, Y_te, P_te)
+
+    # def ood_train(config):
+    #     models, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'])
+    #     tune.report(f1_gap=) # report highest f1 score with lowest f1 inter-subj gap with tol=t
+    #     # return isg
+    # return ood_train
+
+    _, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'])
+
+    save_path = 'out/'+run_method+'/seed='+seed+'/'
+    config_name = 'model_size='+config['ms']+', epochs='+str(config['epochs'])+', lr='+str(config['lr'])+', penalty_weight_factor='+str(config['pwf'])
+
+    # SAVE resulting run data
+    pickle.dump(inter_subj_gap, open(save_path+'ood_run_data('+config_name+').pkl','wb'))
+
+
+
+def ood_fold(cv):
+    seed(39)
+    seeds = [randint(0,1000) for _ in range(0,cv)]
+
+    run_methods = ["REx", "IRM", "ERM"]
+
+    lr = [0.0001, 0.001, 0.01]
+    epochs = [50, 100]
+    pwf = [0.8, 1.2, 1.6, 2]
+    ms = ['small', 'standard', 'large']
+
+    config = {}
+    
+    for method in run_methods:
+        for l in lr:
+            for e in epochs:
+                for p in pwf:
+                    for m in ms:
+                        config['lr'] = l
+                        config['epochs'] = e
+                        config['pwf'] = p
+                        config['ms'] = m
+
+                        for s in seeds:
+                            wrap(s, method, config)
+            
+
+def graph_inter_subj_gap(inter_subj_gap, save_path=None, config_name=None):
+    plt.clf()
+
+    scatter = False
+
+    if scatter:
+        rex = plt.scatter(inter_subj_gap['REx']['f1'][0], inter_subj_gap['REx']['f1'][2], marker='o')
+        irm = plt.scatter(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x')
+        erm = plt.scatter(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p')
+        plt.legend((rex, irm, erm), ('REx', 'IRM', 'ERM'), loc='upper left')
+    else:
+        rex = plt.plot(inter_subj_gap['REx']['f1'][0], inter_subj_gap['REx']['f1'][2], marker='o', label='REx')
+        irm = plt.plot(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x', label='IRM')
+        erm = plt.plot(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p', label='ERM')
+        plt.legend()
+    # plt.title('F1 inter-subject gap vs Training F1')
+    plt.xlabel('Training F1')
+    plt.ylabel('Inter-subject gap F1')
+    plt.show()
+
+
+    for method in ['REx', 'IRM', 'ERM']:
+        plt.clf()
+        x = range(len(inter_subj_gap[method]['loss'][0]))
+        plt.plot(x, inter_subj_gap[method]['loss'][0], label='training')
+        plt.plot(x, inter_subj_gap[method]['loss'][1], label='test')
+        plt.legend()
+        plt.title(method+' loss')
+        plt.show()
+
+        plt.clf()
+        x = range(len(inter_subj_gap[method]['risk'][0]))
+        plt.plot(x, inter_subj_gap[method]['risk'][0], label='training')
+        plt.plot(x, inter_subj_gap[method]['risk'][1], label='test')
+        plt.legend()
+        plt.title(method+' risk')
+        plt.show()
+
+# %matplotlib inline
+def graph_env_pca(env, patient_id, save_path=None, config_name=None):
+    X,Y = env[patient_id]
+
+    plt.rcParams['figure.figsize'] = [10, 10]
+
+    pca = PCA().fit(X.detach().numpy())
+    plt.plot(np.cumsum(pca.explained_variance_ratio_))
+    print('First 5 component variation accountability:',np.cumsum(pca.explained_variance_ratio_)[:5])
+    plt.xlabel('number of components')
+    plt.ylabel('cumulative explained variance');
+    plt.grid()
+    plt.show()
+
+    pca = PCA(2)  # project from 480 to 2 dimensions
+    projected = pca.fit_transform(X.detach().numpy())
+    plt.scatter(projected[:, 0], projected[:, 1],
+                c=Y.detach().numpy().argmax(axis=1), edgecolor='none', alpha=0.5,
+                cmap=plt.cm.get_cmap('Spectral', 9))
+    plt.xlabel('component 1')
+    plt.ylabel('component 2')
+    plt.colorbar();
+    plt.show()
+
+# %matplotlib notebook
+def graph_env_pca_3d(env, patient_id, save_path=None, config_name=None):
+    X,Y = env[patient_id]
+
+    plt.rcParams['figure.figsize'] = [8, 8]
+
+    pca = PCA(3)  # project from 480 to 3 dimensions
+    projected = pca.fit_transform(X.detach().numpy())
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(projected[:, 0], projected[:, 1], projected[:, 2],
+                c=Y.detach().numpy().argmax(axis=1), edgecolor='none', alpha=0.5,
+                cmap=plt.cm.get_cmap('Spectral', 9))
+    ax.set_xlabel('component 1')
+    ax.set_ylabel('component 2')
+    ax.set_zlabel('component 3')
+    plt.show()
+
+# def graph_label_pca_3d(env):
+#     label = {}
+
+#     for patient_id,(X,Y) in enumerate(env):
+#         # label[patient_id] = [] 
+#         pca = PCA(3)  # project from 480 to 3 dimensions
+#         projected = pca.fit_transform(X.detach().numpy())
+
+#         for i in range(len(Y)):
+#             key = Y[i].argmax()
+#             if key in label:
+#                 label[key].append(projected[i,:])
