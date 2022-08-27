@@ -1,5 +1,8 @@
 import numpy as np
 import torch
+import pickle
+import os
+from random import seed, randint
 from torch import nn, optim
 import matplotlib.pyplot as plt
 from torch.autograd import grad
@@ -9,6 +12,8 @@ from sklearn.decomposition import PCA
 
 from sklearn.metrics import f1_score, accuracy_score
 
+from load_data import load_surface_data
+
 class Net(nn.Module):
     def __init__(self, size):
         super(Net, self).__init__()
@@ -16,7 +21,6 @@ class Net(nn.Module):
         self.layers = nn.ModuleList([])
 
         if size == 'large':
-            print('more capacity model')
             # seems like too much capacity for IRM leads to plateau-ing lower
             # it would get stuck at ~30%, while less capacity model settles at ~70%
             # self.layers.append(nn.Linear(606, 909))
@@ -28,7 +32,6 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(909, 9))
             
         elif size == 'standard':
-            print('less capacity model')
             self.layers.append(nn.Linear(480, 606))
             self.layers.append(nn.Linear(606, 303))
             self.layers.append(nn.Linear(303, 606))
@@ -161,7 +164,7 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
     print('SETTINGS Epoch:'+str(epochs)+', Learning Rate:'+str(lr)+', Penalty Weight Factor:'+str(penalty_weight_factor)+', Model Size:'+model_size)
 
     # run_methods = ["REx", "IRM", "ERM"]
-    run_methods = [run_method]
+    # run_methods = [run_method]
     metrics = ['risk', 'loss', 'f1', 'acc']
 
     models = []
@@ -172,86 +175,77 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
 
     inter_subj_gap = {}
 
-    for m in run_methods:
-        inter_subj_gap[m] = {}
-
     for m in metrics:
-        for rm in run_methods:
-            inter_subj_gap[rm][m] = ([],[],[]) # [0] for train metric, [1] for test metric, [2] for gap (train-test)
-            # inter_subj_gap['IRM'][m] = ([],[],[])
-            # inter_subj_gap['ERM'][m] = ([],[],[])
+        inter_subj_gap[m] = ([],[],[]) # [0] for train metric, [1] for test metric, [2] for gap (train-test)
+        # inter_subj_gap['IRM'][m] = ([],[],[])
+        # inter_subj_gap['ERM'][m] = ([],[],[])
 
-    for method in run_methods:
-        print('Running model: '+method)
+    print('Running model: '+run_method)
 
-        # if method in ['IRM', 'REx']:
-        #     model = Net(True).double()
-        # else:
-        #     model = Net().double()
-        model = Net(model_size).double()
+    model = Net(model_size).double()
 
-        optimizer = optim.Adam(model.parameters(), lr=lr)
-        loss_fct = loss_fcts[method]
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    loss_fct = loss_fcts[run_method]
 
-        for step in range(epochs):
+    for step in range(epochs):
 
-            # TRAIN
-            penalty_weight = step**penalty_weight_factor
+        # TRAIN
+        penalty_weight = step**penalty_weight_factor
 
-            model.train()
+        model.train()
 
-            risk, z = loss_fct(model, e_tr, penalty_weight=penalty_weight)
+        risk, z = loss_fct(model, e_tr, penalty_weight=penalty_weight)
 
-            zs.extend(z)
-            xs.extend(list(range(len(z))))
-            ys.extend([step]*len(z))
+        zs.extend(z)
+        xs.extend(list(range(len(z))))
+        ys.extend([step]*len(z))
 
-            optimizer.zero_grad()
-            risk.backward()
-            optimizer.step()
+        optimizer.zero_grad()
+        risk.backward()
+        optimizer.step()
 
-            f1, acc = eval(model, e_tr)
-            print('Epoch: '+ str(step))
-            print('Risk: '+str(risk.item())+',      Loss: '+str(np.array(z).mean())+',      F1: '+str(f1.item())+',      Acc: '+str(acc.item()))
+        f1, acc = eval(model, e_tr)
+        print('Epoch: '+ str(step))
+        print('Risk: '+str(risk.item())+',      Loss: '+str(np.array(z).mean())+',      F1: '+str(f1.item())+',      Acc: '+str(acc.item()))
 
-            # TEST
-            model.eval()
+        # TEST
+        model.eval()
 
-            test_risk, test_z = loss_fct(model, e_te, penalty_weight=penalty_weight)
+        test_risk, test_z = loss_fct(model, e_te, penalty_weight=penalty_weight)
 
-            test_f1, test_acc = eval(model, e_te)
+        test_f1, test_acc = eval(model, e_te)
 
-            print('Test Risk: '+str(test_risk.item())+', Test Loss: '+str(np.array(test_z).mean())+', Test F1: '+str(test_f1.item())+', Test Acc: '+str(test_acc.item()))
+        print('Test Risk: '+str(test_risk.item())+', Test Loss: '+str(np.array(test_z).mean())+', Test F1: '+str(test_f1.item())+', Test Acc: '+str(test_acc.item()))
 
-            inter_subj_gap[method]['risk'][0].append(risk.item())
-            inter_subj_gap[method]['risk'][1].append(test_risk.item())
-            inter_subj_gap[method]['risk'][2].append(risk.item()-test_risk.item())
+        inter_subj_gap['risk'][0].append(risk.item())
+        inter_subj_gap['risk'][1].append(test_risk.item())
+        inter_subj_gap['risk'][2].append(risk.item()-test_risk.item())
 
-            inter_subj_gap[method]['loss'][0].append(np.array(z).mean())
-            inter_subj_gap[method]['loss'][1].append(np.array(test_z).mean())
-            inter_subj_gap[method]['loss'][2].append(np.array(z).mean()-np.array(test_z).mean())
+        inter_subj_gap['loss'][0].append(np.array(z).mean())
+        inter_subj_gap['loss'][1].append(np.array(test_z).mean())
+        inter_subj_gap['loss'][2].append(np.array(z).mean()-np.array(test_z).mean())
 
-            inter_subj_gap[method]['f1'][0].append(f1.item())
-            inter_subj_gap[method]['f1'][1].append(test_f1.item())
-            inter_subj_gap[method]['f1'][2].append(f1.item()-test_f1.item())
+        inter_subj_gap['f1'][0].append(f1.item())
+        inter_subj_gap['f1'][1].append(test_f1.item())
+        inter_subj_gap['f1'][2].append(f1.item()-test_f1.item())
 
-            inter_subj_gap[method]['acc'][0].append(acc.item())
-            inter_subj_gap[method]['acc'][1].append(test_acc.item())
-            inter_subj_gap[method]['acc'][2].append(acc.item()-test_acc.item())
+        inter_subj_gap['acc'][0].append(acc.item())
+        inter_subj_gap['acc'][1].append(test_acc.item())
+        inter_subj_gap['acc'][2].append(acc.item()-test_acc.item())
 
-        models.append(model)
+    # models.append(model)
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(ys,xs,zs)
-        ax.set_xlabel('Epoch')
-        ax.set_ylabel('Environment ie. patient')
-        ax.set_zlabel('Risk')
-        plt.show()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(ys,xs,zs)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Environment ie. patient')
+    ax.set_zlabel('Risk')
+    plt.show()
 
-        print('+'*30)
+    print('+'*30)
 
-    return models, inter_subj_gap
+    return model, inter_subj_gap
 
 def wrap(seed, run_method, config):
     X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(seed, True)
@@ -267,13 +261,16 @@ def wrap(seed, run_method, config):
 
     _, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'])
 
-    save_path = 'out/'+run_method+'/seed='+seed+'/'
-    config_name = 'model_size='+config['ms']+', epochs='+str(config['epochs'])+', lr='+str(config['lr'])+', penalty_weight_factor='+str(config['pwf'])
+    save_path = 'out/'+run_method+'/seed='+str(seed)+'/'
+    config_name = 'model_size=' +config['ms']+ ',epochs=' +str(config['epochs'])+ ',lr=' +str(config['lr'])+ ',penalty_weight_factor=' +str(config['pwf'])
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     # SAVE resulting run data
-    pickle.dump(inter_subj_gap, open(save_path+'ood_run_data('+config_name+').pkl','wb'))
+    pickle.dump(isg, open(save_path+'ood_run_data('+config_name+').pkl','wb'))
 
-
+    graph_inter_subj_gap(isg, run_method, save_path=save_path, config_name=config_name)
 
 def ood_fold(cv):
     seed(39)
@@ -285,6 +282,11 @@ def ood_fold(cv):
     epochs = [50, 100]
     pwf = [0.8, 1.2, 1.6, 2]
     ms = ['small', 'standard', 'large']
+
+    # lr = [0.01]
+    # epochs = [50]
+    # pwf = [1.6]
+    # ms = ['standard']
 
     config = {}
     
@@ -302,46 +304,56 @@ def ood_fold(cv):
                             wrap(s, method, config)
             
 
-def graph_inter_subj_gap(inter_subj_gap, save_path=None, config_name=None):
+def graph_inter_subj_gap(inter_subj_gap, run_method, save_path=None, config_name=None):
     plt.clf()
 
     scatter = False
 
     if scatter:
-        rex = plt.scatter(inter_subj_gap['REx']['f1'][0], inter_subj_gap['REx']['f1'][2], marker='o')
-        irm = plt.scatter(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x')
-        erm = plt.scatter(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p')
-        plt.legend((rex, irm, erm), ('REx', 'IRM', 'ERM'), loc='upper left')
+        m = plt.scatter(inter_subj_gap['f1'][0], inter_subj_gap['f1'][2], marker='o')
+        # irm = plt.scatter(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x')
+        # erm = plt.scatter(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p')
+        plt.legend((m), (run_method), loc='upper left')
     else:
-        rex = plt.plot(inter_subj_gap['REx']['f1'][0], inter_subj_gap['REx']['f1'][2], marker='o', label='REx')
-        irm = plt.plot(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x', label='IRM')
-        erm = plt.plot(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p', label='ERM')
+        rex = plt.plot(inter_subj_gap['f1'][0], inter_subj_gap['f1'][2], marker='o', label=run_method)
+        # irm = plt.plot(inter_subj_gap['IRM']['f1'][0], inter_subj_gap['IRM']['f1'][2], marker='x', label='IRM')
+        # erm = plt.plot(inter_subj_gap['ERM']['f1'][0], inter_subj_gap['ERM']['f1'][2], marker='p', label='ERM')
         plt.legend()
-    # plt.title('F1 inter-subject gap vs Training F1')
     plt.xlabel('Training F1')
     plt.ylabel('Inter-subject gap F1')
-    plt.show()
+    plt.title(run_method+' Inter-subject gap vs Training F1')
 
-
-    for method in ['REx', 'IRM', 'ERM']:
-        plt.clf()
-        x = range(len(inter_subj_gap[method]['loss'][0]))
-        plt.plot(x, inter_subj_gap[method]['loss'][0], label='training')
-        plt.plot(x, inter_subj_gap[method]['loss'][1], label='test')
-        plt.legend()
-        plt.title(method+' loss')
+    if save_path is None and config_name is None:
         plt.show()
+    else:
+        plt.savefig(save_path+'inter_subj_gap_vs_train('+config_name+').png')
 
-        plt.clf()
-        x = range(len(inter_subj_gap[method]['risk'][0]))
-        plt.plot(x, inter_subj_gap[method]['risk'][0], label='training')
-        plt.plot(x, inter_subj_gap[method]['risk'][1], label='test')
-        plt.legend()
-        plt.title(method+' risk')
+
+    # for method in ['REx', 'IRM', 'ERM']:
+    plt.clf()
+    x = range(len(inter_subj_gap['loss'][0]))
+    plt.plot(x, inter_subj_gap['loss'][0], label='training')
+    plt.plot(x, inter_subj_gap['loss'][1], label='test')
+    plt.legend()
+    plt.title(run_method+' loss')
+    if save_path is None and config_name is None:
         plt.show()
+    else:
+        plt.savefig(save_path+'train-test_loss('+config_name+').png')
+
+    plt.clf()
+    x = range(len(inter_subj_gap['risk'][0]))
+    plt.plot(x, inter_subj_gap['risk'][0], label='training')
+    plt.plot(x, inter_subj_gap['risk'][1], label='test')
+    plt.legend()
+    plt.title(run_method+' risk')
+    if save_path is None and config_name is None:
+        plt.show()
+    else:
+        plt.savefig(save_path+'train-test_risk('+config_name+').png')
 
 # %matplotlib inline
-def graph_env_pca(env, patient_id, save_path=None, config_name=None):
+def graph_env_pca(env, patient_id):
     X,Y = env[patient_id]
 
     plt.rcParams['figure.figsize'] = [10, 10]
@@ -365,7 +377,7 @@ def graph_env_pca(env, patient_id, save_path=None, config_name=None):
     plt.show()
 
 # %matplotlib notebook
-def graph_env_pca_3d(env, patient_id, save_path=None, config_name=None):
+def graph_env_pca_3d(env, patient_id):
     X,Y = env[patient_id]
 
     plt.rcParams['figure.figsize'] = [8, 8]
