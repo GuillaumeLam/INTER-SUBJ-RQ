@@ -248,6 +248,14 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
     return model, inter_subj_gap
 
 def wrap(seed, run_method, config):
+    print('+='*25)
+    print('Seed:', seed)
+    config_name = 'model_size=' +config['ms']+ ',epochs=' +str(config['epochs'])+ ',lr=' +str(config['lr'])+ ',penalty_weight_factor=' +str(config['pwf'])
+    save_path = 'out/'+run_method+'/'+config_name+'/seed='+str(seed)+'/'
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    
     X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(seed, True)
 
     e_tr = env_split(X_tr, Y_tr, P_tr)
@@ -261,16 +269,11 @@ def wrap(seed, run_method, config):
 
     _, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'])
 
-    save_path = 'out/'+run_method+'/seed='+str(seed)+'/'
-    config_name = 'model_size=' +config['ms']+ ',epochs=' +str(config['epochs'])+ ',lr=' +str(config['lr'])+ ',penalty_weight_factor=' +str(config['pwf'])
-
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-
     # SAVE resulting run data
     pickle.dump(isg, open(save_path+'ood_run_data('+config_name+').pkl','wb'))
 
     graph_inter_subj_gap(isg, run_method, save_path=save_path, config_name=config_name)
+    print('+='*25)
 
 def ood_fold(cv):
     seed(39)
@@ -280,7 +283,7 @@ def ood_fold(cv):
 
     lr = [0.0001, 0.001, 0.01]
     epochs = [50, 100]
-    pwf = [0.8, 1.2, 1.6, 2]
+    pwf = [0.8, 1.2, 1.6]
     ms = ['small', 'standard', 'large']
 
     # lr = [0.01]
