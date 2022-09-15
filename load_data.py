@@ -120,3 +120,12 @@ def load_surface_data(seed, subject_wise, split=0.3):
 	# X_tr, Y_tr, P_tr, X_te, Y_te, P_te
 	KEY = 'Lower'
 	return AnnData['X_train'][KEY], Lab.one_hot(AnnData['y_train'][KEY]), P_tr, AnnData['X_test'][KEY], Lab.one_hot(AnnData['y_test'][KEY]), P_te, Lab
+
+def load_raw_surface_data(seed, subject_wise, split=0.3):
+	X = np.load('dataset/GoIS_X_norm.npy')
+	Y = np.load('dataset/GoIS_Y_norm.npy')
+	P = np.load('dataset/GoIS_P_norm.npy')
+
+	X_tr, Y_tr, X_te, Y_te, P_tr, P_te = subject_wise_split(X, Y, P, subject_wise=subject_wise, split=split, seed=seed)
+
+	return X_tr, Y_tr, X_te, Y_te, P_tr, P_te

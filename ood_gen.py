@@ -1,16 +1,14 @@
+import matplotlib.pyplot as plt
 import numpy as np
-import torch
 import pickle
 import os
 from random import seed, randint
+from sklearn.decomposition import PCA
+from sklearn.metrics import f1_score, accuracy_score
+import torch
 from torch import nn, optim
-import matplotlib.pyplot as plt
 from torch.autograd import grad
 import torch.nn.functional as f
-
-from sklearn.decomposition import PCA
-
-from sklearn.metrics import f1_score, accuracy_score
 
 from load_data import load_surface_data
 
@@ -158,7 +156,7 @@ def eval(model, env):
 
     return torch.tensor(f1).mean(), torch.tensor(acc).mean()
 
-def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epochs=50, lr=0.001, penalty_weight_factor=1.6):
+def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epochs=50, lr=0.001, penalty_weight_factor=1.6, batch_size=3):
     torch.manual_seed(seed)
 
     print('SETTINGS Epoch:'+str(epochs)+', Learning Rate:'+str(lr)+', Penalty Weight Factor:'+str(penalty_weight_factor)+', Model Size:'+model_size)
@@ -188,21 +186,21 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
     loss_fct = loss_fcts[run_method]
 
     for step in range(epochs):
+        for i in range(0,21,batch_size):
+            # TRAIN
+            penalty_weight = step**penalty_weight_factor
 
-        # TRAIN
-        penalty_weight = step**penalty_weight_factor
+            model.train()
 
-        model.train()
+            risk, z = loss_fct(model, e_tr[i:i+batch_size], penalty_weight=penalty_weight)
 
-        risk, z = loss_fct(model, e_tr, penalty_weight=penalty_weight)
+            zs.extend(z)
+            xs.extend(list(range(len(z))))
+            ys.extend([step]*len(z))
 
-        zs.extend(z)
-        xs.extend(list(range(len(z))))
-        ys.extend([step]*len(z))
-
-        optimizer.zero_grad()
-        risk.backward()
-        optimizer.step()
+            optimizer.zero_grad()
+            risk.backward()
+            optimizer.step()
 
         f1, acc = eval(model, e_tr)
         print('Epoch: '+ str(step))
@@ -235,13 +233,13 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
 
     # models.append(model)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(ys,xs,zs)
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Environment ie. patient')
-    ax.set_zlabel('Risk')
-    plt.show()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(ys,xs,zs)
+    # ax.set_xlabel('Epoch')
+    # ax.set_ylabel('Environment ie. patient')
+    # ax.set_zlabel('Risk')
+    # plt.show()
 
     print('+'*30)
 
@@ -250,7 +248,7 @@ def inter_subj_ood(run_method, e_tr, e_te, seed=39, model_size='standard', epoch
 def wrap(seed, run_method, config):
     print('+='*25)
     print('Seed:', seed)
-    config_name = 'model_size=' +config['ms']+ ',epochs=' +str(config['epochs'])+ ',lr=' +str(config['lr'])+ ',penalty_weight_factor=' +str(config['pwf'])
+    config_name = 'model_size=' +config['ms']+ ',epochs=' +str(config['epochs'])+ ',lr=' +str(config['lr'])+ ',penalty_weight_factor=' +str(config['pwf'])+ ',batch_size=' +str(config['bs'])
     save_path = 'out/'+run_method+'/'+config_name+'/seed='+str(seed)+'/'
 
     if not os.path.exists(save_path):
@@ -267,7 +265,7 @@ def wrap(seed, run_method, config):
     #     # return isg
     # return ood_train
 
-    _, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'])
+    _, isg = inter_subj_ood(run_method, e_tr, e_te, seed=seed, model_size=config['ms'], epochs=config['epochs'], lr=config['lr'], penalty_weight_factor=config['pwf'], batch_size=config['bs'])
 
     # SAVE resulting run data
     pickle.dump(isg, open(save_path+'ood_run_data('+config_name+').pkl','wb'))
@@ -281,9 +279,9 @@ def ood_fold(cv):
 
     run_methods = ["REx", "IRM", "ERM"]
 
-    lr = [0.0001, 0.001, 0.01]
-    epochs = [50, 100]
-    pwf = [0.8, 1.2, 1.6]
+    lr = [0.0005, 0.001, 0.005]              
+    epochs = [150]
+    pwf = [0.6, 0.8, 1.2]
     ms = ['small', 'standard', 'large']
 
     # lr = [0.01]
@@ -302,6 +300,7 @@ def ood_fold(cv):
                         config['epochs'] = e
                         config['pwf'] = p
                         config['ms'] = m
+                        config['bs'] = 3
 
                         for s in seeds:
                             wrap(s, method, config)
