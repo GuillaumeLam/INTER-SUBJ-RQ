@@ -226,7 +226,7 @@ def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id, log_sc
 
 		plt.figlegend()
 		plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-		plt.suptitle('F1 vs calibration size for surface types')
+		plt.suptitle('F1 vs calibration size'+('(log)' if log_scale else '')+' per surface types')
 
 	else:
 		label_f1 = np.array(label_f1)
@@ -269,7 +269,7 @@ def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id, log_sc
 		if log_scale:
 			plt.xscale('symlog')
 		plt.ylabel('F1')
-		plt.title('F1 vs calibration size for surface types')
+		plt.title('F1 vs calibration size'+('(log)' if log_scale else ''))
 
 	title = 'f1_vs_calib_size_per_label_'+('detail_' if detail else '')
 	epochs=50
@@ -373,7 +373,6 @@ def graph_holdout(holdout_f1, rw_f1, sw_f1, freeze=False, std=True):
 		)
 
 	plt.legend()
-
-
+	plt.title('F1 vs surface types')
 
 	plt.savefig('./out/'+'sw_vs_rw_split_with_holdout'+('(freeze=True)' if freeze else ''))
