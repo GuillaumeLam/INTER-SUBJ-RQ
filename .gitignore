@@ -146,3 +146,6 @@ extra_code/dataset/py_compatible_data.mat
 extra_code/dataset/*.npy
 
 extra_code/INTER_SUBJ_CALIB/.\\LDA9Surface\\Magnitude_sepratedLDA_15%_32_606n.pkl
+
+*.pkl
+*/*.pkl
