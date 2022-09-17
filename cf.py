@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-import pickle
+import dill
 import tensorflow as tf
 from tensorflow.keras import backend as K
 
@@ -165,7 +165,7 @@ class WeightTrackerCallback(tf.keras.callbacks.Callback):
 
 def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	num_class = 9
-	layers_to_mod = ['fc1','fc2','fc3']
+	# args.layer = ['fc1','fc2','fc3']
 
 	z_shape = len(set(Ptrain))
 
@@ -187,7 +187,7 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 		]
 	)
-	weights = IS_ANNS.ann.getWeights(layers=layers_to_mod)
+	weights = IS_ANNS.ann.getWeights(layers=args.layer)
 
 	# print(weights)
 
@@ -198,7 +198,7 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	print('2'*30)
 	print('='*30)
 
-	weight_pre = IS_ANNS.ann.getWeights(layers=layers_to_mod)
+	weight_pre = IS_ANNS.ann.getWeights(layers=args.layer)
 
 	# print(weight_pre)
 
@@ -214,10 +214,10 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	# print('changes:',changes)
 	# changes = np.zeros_like(weight_pre)
 	esc = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
-	wtc = WeightTrackerCallback(weight_pre, changes, layers_to_mod)
+	wtc = WeightTrackerCallback(weight_pre, changes, args.layer)
 
 	IS_ANNS.switchMode()
-	IS_ANNS.ann.freezeOtherWeights(layers=layers_to_mod)
+	IS_ANNS.ann.freezeOtherWeights(layers=args.layer)
 
 	ohe = OneHotEncoder()
 	Ptrain_oh = ohe.fit_transform(Ptrain.reshape(-1, 1)).toarray()
@@ -287,37 +287,57 @@ def cv_hparam(args):
 	seed(39)
 	seeds = [randint(0,1000) for _ in range(0,args.cv_folds)]
 
-	h_param = [{'threshold':[0.005, 0.01, 0.05]}]
+	h_param = {'threshold':[0.005, 0.01, 0.05], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
+
+	def cross(h_param):
+		comb = []
+		for k,v in [(k,v) for k,v in h_param.items()]:
+			if len(comb)==0:
+				for arg_val in v:
+					comb.append({k:arg_val})
+			else:
+				cross = comb
+				comb = []
+
+				for d in cross:
+					for arg_val in v:
+						new_d = dict(d)
+						new_d[k]=arg_val 
+						comb.append(new_d)
+		return comb
+
+	h_param = cross(h_param)
 
 	def get_hparam(args):
-		return f"threshold={args.threshold}"
+		return f"threshold={args.threshold},layer={args.layer}"
 
 	scores = {}
 	models = {}
 
-	for p in h_param:
-		for v in list(p.values())[0]:
-			args.threshold=v
-			scores[get_hparam(args)]={}
-			models[get_hparam(args)]={}
-			for s in seeds:
-				# samples = 54
-				# X_tr = np.zeros((samples,480))
-				# Y_tr = np.ones((samples,9))
-				# P_tr = np.array(list(range(1,samples)))
-				# X_te = X_tr
-				# Y_te = Y_tr
+	for d in h_param:
+		args.threshold=d['threshold']
+		args.layer=d['layer']
 
-				X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(s, True, split=0.1)
+		scores[get_hparam(args)]={}
+		models[get_hparam(args)]={}
+		for s in seeds:
+			# samples = 54
+			# X_tr = np.zeros((samples,480))
+			# Y_tr = np.ones((samples,9))
+			# P_tr = np.array(list(range(1,samples)))
+			# X_te = X_tr
+			# Y_te = Y_tr
 
-				tf.random.set_seed(s)
-				np.random.seed(s)
+			X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(s, True, split=0.1)
 
-				IS_ANNS, f1_score = CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
-				scores[get_hparam(args)][s]=f1_score
-				models[get_hparam(args)][s]=IS_ANNS
+			tf.random.set_seed(s)
+			np.random.seed(s)
 
-				print(scores)
+			IS_ANNS, f1_score = CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
+			scores[get_hparam(args)][s]=f1_score
+			models[get_hparam(args)][s]=IS_ANNS
+
+			print(scores)
 
 	return scores, models
 
@@ -331,7 +351,8 @@ if __name__ == "__main__":
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size during training per GPU')
 	parser.add_argument('-t', '--threshold', type=float, default=0.01, help='threshold of updating the weights')
 	parser.add_argument('-f', '--cv_folds', type=int, default=7, help='number of cross validation folds')
-	# parser.add_argument('-n', '--layer', type=str, default='fc1_weights', help='the layer we are interested in adjust')
+	# parser.add_argument('-n', '--layer', type=str, default=['fc1', 'fc2', 'fc3'], help='the layer we are interested in adjust')
+	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2', 'fc3'], help='the layer we are interested in adjust')
 	# parser.add_argument('-s', '--seed', type=int, default=0, help='random seed for generating data')
 	args = parser.parse_args()
 
@@ -340,4 +361,5 @@ if __name__ == "__main__":
 
 	scores, models = cv_hparam(args)
 
-	pickle.dump((scores, models), open('CF_scores.pkl','wb'))
+	dill.dump(scores, open('CF_scores.pkl','wb'))
+	dill.dump(models, open('models.pkl','wb'))
