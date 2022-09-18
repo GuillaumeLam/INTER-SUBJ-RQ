@@ -193,25 +193,15 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 
 	for i, nc in enumerate(norm_changes):
 		if weights[i] is not None and nc is not None:
+			# check distribution of weights
 			# bin_width = 0.01
-
 			# plt.hist(nc, bins=np.arange(np.min(nc), np.max(nc)+bin_width, bin_width))
 			# plt.title('Histogram of normalized weight changes')
 			# plt.show()
 
-			# print('after')
-
-			# check distribution of weights
-			# todo: given percentage, change threshold => easier to check on % of pruning
-			# idx = int(prune_percent*nc.size)
-			# indices = np.argpartition(nc, -idx)[-idx:]
-			# percent_threshold = nc[np.argpartition(nc, -idx)[-idx]]
-
-			# percent_threshold = np.percentile(nc, 100-prune_percent)
-			# indices = np.where(nc > percent_threshold)[0]
+			# prunes the top X% highest contributing connections to identity
 			percent_threshold = np.percentile(nc, 100-args.prune)
 			indices = np.where(nc > percent_threshold)[0]
-
 			# indices = np.where(nc > args.threshold)[0]
 		
 			weights[i].put(indices, 0)
