@@ -16,20 +16,35 @@ def lda_featuers(x_train,y_train):
 	x_train=lda.fit_transform(x_train,y_train)
 	return x_train,lda
 
-
-def _CACHED_load_surface_data(seed, **kwargs):
+# measure size of each dataset and account based on max mem. (if you can only cache 2 but want 4 folds, iterrate params faster than cached dataset)
+def _CACHED_load_surface_data(seed, *args, **kwargs):
+	global _cached_Irregular_Surface_Dataset
 
 	# caching mechanism
 	if path.exists('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl'):
-		cached_dataset_dict = pickle.load(open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','rb'))
-		if seed in cached_dataset_dict:
-			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = cached_dataset_dict[seed] 
-	else:
-		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, GL2GO = load_surface_data(seed, **kwargs)
-		cached_dataset_dict = {}
-		cached_dataset_dict[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
+		_cached_Irregular_Surface_Dataset = pickle.load(open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','rb'))
 
-	return X_tr, Y_tr, P_tr, X_te, Y_te, P_te, cached_dataset_dict
+		if seed in _cached_Irregular_Surface_Dataset:
+			print(f"CACHE HIT FOR SEED#{seed}")
+			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _cached_Irregular_Surface_Dataset[seed]
+			return X_tr, Y_tr, P_tr, X_te, Y_te, P_te
+		else:
+			print(f"CACHE MISS FOR SEED#{seed}")
+			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = load_surface_data(seed, *args, **kwargs)
+			# _cached_Irregular_Surface_Dataset[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
+			# pickle.dump(_cached_Irregular_Surface_Dataset,open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','wb'))
+			# # _cached_Irregular_Surface_Dataset[s]= (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
+			# print(f"ADDING SEEDED DATASET-{seed} TO CACHE")
+	else:
+		print('NO DATASET CACHE')
+		X_tr, Y_tr, P_tr, X_te, Y_te, P_te = load_surface_data(seed, *args, **kwargs)
+		_cached_Irregular_Surface_Dataset = {}	
+
+	_cached_Irregular_Surface_Dataset[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
+	pickle.dump(_cached_Irregular_Surface_Dataset,open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','wb'))
+	print(f"ADDING SEEDED DATASET-{seed} TO CACHE")
+
+	return X_tr, Y_tr, P_tr, X_te, Y_te, P_te
 
 
 def load_surface_data(seed, subject_wise, split=0.3):
@@ -138,7 +153,7 @@ def load_surface_data(seed, subject_wise, split=0.3):
 
 	# X_tr, Y_tr, P_tr, X_te, Y_te, P_te
 	KEY = 'Lower'
-	return AnnData['X_train'][KEY], Lab.one_hot(AnnData['y_train'][KEY]), P_tr, AnnData['X_test'][KEY], Lab.one_hot(AnnData['y_test'][KEY]), P_te, Lab
+	return AnnData['X_train'][KEY], Lab.one_hot(AnnData['y_train'][KEY]), P_tr, AnnData['X_test'][KEY], Lab.one_hot(AnnData['y_test'][KEY]), P_te
 
 def load_raw_surface_data(seed, subject_wise, split=0.3):
 	X = np.load('dataset/GoIS_X_norm.npy')

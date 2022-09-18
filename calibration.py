@@ -1,5 +1,6 @@
-from load_data import load_surface_data
+from load_data import load_surface_data, _CACHED_load_surface_data
 from subject_wise_split import subject_wise_split
+from cf import CF_DNN
 
 import numpy as np
 from sklearn.metrics import f1_score
@@ -12,15 +13,16 @@ import matplotlib.pyplot as plt
 
 labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 
-def single_run(Lab, X_train, y_train, X_test, y_test):
+def single_run(X_train, y_train, X_test, y_test):
 	result = {}
 
-	hid_layers=(606,303,606) #hidden layers
-	model='classification' #problem type
-	output= y_train.shape[-1] #ouput shape 
-	input_shape=X_train.shape[-1]
-	ann=Lab.ANN(hid_layers=hid_layers,model=model,output=output,input_shape=input_shape,activation_hid='relu') # relu in hidden layers
-	
+	# hid_layers=(606,303,606) #hidden layers
+	# model='classification' #problem type
+	# output= y_train.shape[-1] #ouput shape 
+	# input_shape=X_train.shape[-1]
+	# ann=Lab.ANN(hid_layers=hid_layers,model=model,output=output,input_shape=input_shape,activation_hid='relu') # relu in hidden layers
+	ann = CF_DNN(x_shape=(480), y_shape=9, model_shape=(606,303,606)).ann
+
 	ann.fit(X_train,y_train,batch_size=512,epochs=50, validation_split=0.1)
 	y_pred=ann.predict(X_test)
 	a=np.zeros_like(y_pred)
@@ -102,6 +104,9 @@ def calibrated_line(model, X_test, Y_test, P_test, seed, freeze):
 	return label_f1, calib_sizes, calibrated_model
 
 def calib_data(cv=1, freeze=False, holdout=False):
+	global _cached_Irregular_Surface_Dataset
+	_cached_Irregular_Surface_Dataset=None
+
 	seed(39)
 	seeds = [randint(0,1000) for _ in range(0,cv)]
 
@@ -114,10 +119,11 @@ def calib_data(cv=1, freeze=False, holdout=False):
 
 	for i,s in enumerate(seeds):
 
-		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, lab = load_surface_data(s, False, split=0.1)
-		rw_result, _, _ = single_run(lab, X_tr, Y_tr, X_te, Y_te)
+		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(s, False, split=0.1)
+		rw_result, _, _ = single_run(X_tr, Y_tr, X_te, Y_te)
 
-		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, lab = load_surface_data(s, True, split=0.1)
+		X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(s, True, split=0.1)
+		
 		if holdout:
 			X_tr, Y_tr, X_hold, Y_hold, P_tr, P_hold = subject_wise_split(X_tr, Y_tr, P_tr, split=0.1, seed=s, subject_wise=True)
 		sw_result, sw_model, (X_te, Y_te) = single_run(lab, X_tr, Y_tr, X_te, Y_te)
