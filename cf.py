@@ -61,7 +61,7 @@ class ModelPlus(Model):
 
 
 class CF_DNN(object):
-	def __init__(self, x_shape=(480), y_shape=9, z_shape=30, model_shape=(606,303,606)):
+	def __init__(self, x_shape=(480), y_shape=9, z_shape=None, model_shape=(606,303,606)):
 		inputs = Input(shape=x_shape)
 		fc1 = Dense(model_shape[0],activation='relu', name='fc1')(inputs)
 		fc2 = Dense(model_shape[1],activation='relu', name='fc2')(fc1)
@@ -69,20 +69,24 @@ class CF_DNN(object):
 
 		out_y = Dense(y_shape,activation='softmax', name='out_y')(fc3)
 
-		out_z = Dense(z_shape,activation='softmax', name='out_z')(fc3)
+		if z_shape is not None:
+			out_z = Dense(z_shape,activation='softmax', name='out_z')(fc3)
 
 		self.model_y = ModelPlus(inputs=inputs, outputs=out_y)
 		self.model_y._name = 'IS_Ann_Y'
 		self.model_y.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
 
-		self.model_z = ModelPlus(inputs=inputs, outputs=out_z)
-		self.model_z._name = 'IS_Ann_Z'
-		self.model_z.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
+		if z_shape is not None:
+			self.model_z = ModelPlus(inputs=inputs, outputs=out_z)
+			self.model_z._name = 'IS_Ann_Z'
+			self.model_z.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
 
 		self.setMode('model_y')
 
 		self.model_y.summary()
-		self.model_z.summary()
+
+		if z_shape is not None:
+			self.model_z.summary()
 
 	def setMode(self, mode):
 		self.ann = getattr(self, mode)
@@ -225,8 +229,8 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	return IS_CF_DNN, f1_score
 
 def cv_hparam(args):
-	_CACHED_load_surface_data=None
-	seed(39)
+	global _cached_Irregular_Surface_Dataset
+
 	seeds = [randint(0,1000) for _ in range(0,args.cv_folds)]
 
 	if args.seed is not None:
@@ -265,29 +269,27 @@ def cv_hparam(args):
 
 	scores = {}
 	models = {}
-	if path.exists('CF_scores.pkl'):
-		scores = pickle.load(open('CF_scores.pkl', 'rb'))
+	if path.exists('out/CF_scores.pkl'):
+		scores = pickle.load(open('out/CF_scores.pkl', 'rb'))
 
-	for d in h_param:
-		# args.threshold=d['threshold']
-		# args.layer=d['layer']
+	for s in seeds:
+		hit = 0
+		for d in h_param:
+			for k,v in d.items():
+				setattr(args,k,v)
 
-		for k,v in d.items():
-			setattr(args,k,v)
+			if get_hparam(args) not in scores:
+				scores[get_hparam(args)]={}
+			models[get_hparam(args)]={}
 
-		if get_hparam(args) not in scores:
-			scores[get_hparam(args)]={}
-		models[get_hparam(args)]={}
-
-		for s in seeds:
 			if s in scores[get_hparam(args)] and args.seed is None:
-				s = randint(0,1000)
+				print(f"SCORE CACHE HIT:{get_hparam(args)}")
+				hit += 0
+				continue
 
-			if _CACHED_load_surface_data is None:
-				X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _, _CACHED_load_surface_data = load_surface_data(s, True, split=0.1)
-			else:
-				X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data[seed]
-
+			print(f"SCORE CACHE MISS:{get_hparam(args)}")
+			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(s, True, split=0.1)
+			
 			tf.random.set_seed(s)
 			np.random.seed(s)
 
@@ -296,10 +298,13 @@ def cv_hparam(args):
 			scores[get_hparam(args)][s]=f1_score
 			models[get_hparam(args)][s]=IS_CF_DNN
 
-			pickle.dump(scores, open('CF_scores.pkl','wb'))
+			pickle.dump(scores, open('out/CF_scores.pkl','wb'))
 
 			print('Latest score with params '+get_hparam(args)+':'+str(f1_score))
 			print(scores)
+
+		# if hit == len(h_param):
+			# cached seeded-dataset can be del
 
 	return scores, models
 
@@ -314,6 +319,8 @@ if __name__ == "__main__":
 	parser.add_argument('-s', '--seed', type=int, default=None, help='seed')
 	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2', 'fc3'], help='the layer we are interested in adjust')
 	args = parser.parse_args()
+
+	seed(39)
 
 	scores, models = cv_hparam(args)
 
