@@ -1,4 +1,7 @@
+import os.path
+from os import path
 import pandas as pd
+import pickle
 import numpy as np
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
@@ -12,6 +15,22 @@ def lda_featuers(x_train,y_train):
 	lda= LDA(n_components=n_components)
 	x_train=lda.fit_transform(x_train,y_train)
 	return x_train,lda
+
+
+def _CACHED_load_surface_data(seed, **kwargs):
+
+	# caching mechanism
+	if path.exists('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl'):
+		cached_dataset_dict = pickle.load(open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','rb'))
+		if seed in cached_dataset_dict:
+			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = cached_dataset_dict[seed] 
+	else:
+		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, GL2GO = load_surface_data(seed, **kwargs)
+		cached_dataset_dict = {}
+		cached_dataset_dict[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
+
+	return X_tr, Y_tr, P_tr, X_te, Y_te, P_te, cached_dataset_dict
+
 
 def load_surface_data(seed, subject_wise, split=0.3):
 	dp=pd.read_pickle('cycle1_with_wrist_Normalized.pkl') #cycle1_with_wrist,cycle1_9surface

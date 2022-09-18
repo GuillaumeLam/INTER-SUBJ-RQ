@@ -1,4 +1,5 @@
 import argparse
+import matplotlib.pyplot as plt
 import numpy as np
 import os.path
 from os import path
@@ -11,7 +12,7 @@ from sklearn.preprocessing import OneHotEncoder
 from tensorflow.keras import Input, Model
 from tensorflow.keras.layers import Dense
 
-from load_data import load_surface_data
+from load_data import load_surface_data, _CACHED_load_surface_data
 
 
 def weight_variable(shape):
@@ -59,8 +60,8 @@ class ModelPlus(Model):
 				layer.trainable = False
 
 
-class CF_DL(object):
-	def __init__(self, z_shape, x_shape=(480), y_shape=9, model_shape=(606,303,606)):
+class CF_DNN(object):
+	def __init__(self, x_shape=(480), y_shape=9, z_shape=30, model_shape=(606,303,606)):
 		inputs = Input(shape=x_shape)
 		fc1 = Dense(model_shape[0],activation='relu', name='fc1')(inputs)
 		fc2 = Dense(model_shape[1],activation='relu', name='fc2')(fc1)
@@ -114,11 +115,11 @@ class WeightTrackerCallback(tf.keras.callbacks.Callback):
 
 
 def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
+	dim_features = (480)
 	num_class = 9
-
 	z_shape = len(set(Ptrain))
 
-	IS_CF_DL = CF_DL(z_shape)
+	IS_CF_DNN = CF_DNN(x_shape=dim_features, y_shape=num_class, z_shape=z_shape, model_shape=(606,303,606))
 
 	# Phase One
 	print('='*30)
@@ -126,7 +127,7 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	print('1'*30)
 	print('='*30)
 
-	history = IS_CF_DL.ann.fit(
+	history = IS_CF_DNN.ann.fit(
 		Xtrain,
 		Ytrain,
 		epochs=args.epochs,
@@ -136,7 +137,7 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 		]
 	)
-	weights = IS_CF_DL.ann.getWeights(layers=args.layer)
+	weights = IS_CF_DNN.ann.getWeights(layers=args.layer)
 
 	# Phase Two
 	print('='*30)
@@ -144,7 +145,7 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	print('2'*30)
 	print('='*30)
 
-	weight_pre = IS_CF_DL.ann.getWeights(layers=args.layer)
+	weight_pre = IS_CF_DNN.ann.getWeights(layers=args.layer)
 
 	def hof_None_check(func):
 		def hof(i):
@@ -157,13 +158,13 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	esc = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 	wtc = WeightTrackerCallback(weight_pre, changes, args.layer)
 
-	IS_CF_DL.switchMode()
-	IS_CF_DL.ann.freezeOtherWeights(layers=args.layer)
+	IS_CF_DNN.switchMode()
+	IS_CF_DNN.ann.freezeOtherWeights(layers=args.layer)
 
 	ohe = OneHotEncoder()
 	Ptrain_oh = ohe.fit_transform(Ptrain.reshape(-1, 1)).toarray()
 
-	history = IS_CF_DL.ann.fit(
+	history = IS_CF_DNN.ann.fit(
 		Xtrain,
 		Ptrain_oh,
 		epochs=args.epochs_cf,
@@ -184,30 +185,47 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	print('3'*30)
 	print('='*30)
 
-	num_neuron_pruned = 0
+	# prune_percent = 10 # prunes the top X% highest contributing connections to identity
 
 	for i, nc in enumerate(norm_changes):
 		if weights[i] is not None and nc is not None:
+			# bin_width = 0.01
+
+			# plt.hist(nc, bins=np.arange(np.min(nc), np.max(nc)+bin_width, bin_width))
+			# plt.title('Histogram of normalized weight changes')
+			# plt.show()
+
+			# print('after')
+
 			# check distribution of weights
-
 			# todo: given percentage, change threshold => easier to check on % of pruning
-			indices = np.where(nc > args.threshold)[0]
-			num_neuron_pruned += indices.shape[0]
-			print(f"Pruned {indices.shape[0]/(weights[i].shape[0]*weights[i].shape[1])*100}% of layer {i}")
+			# idx = int(prune_percent*nc.size)
+			# indices = np.argpartition(nc, -idx)[-idx:]
+			# percent_threshold = nc[np.argpartition(nc, -idx)[-idx]]
+
+			# percent_threshold = np.percentile(nc, 100-prune_percent)
+			# indices = np.where(nc > percent_threshold)[0]
+			percent_threshold = np.percentile(nc, 100-args.prune)
+			indices = np.where(nc > percent_threshold)[0]
+
+			# indices = np.where(nc > args.threshold)[0]
+		
 			weights[i].put(indices, 0)
+			print(f"Pruned {indices.shape[0]/(weights[i].shape[0]*weights[i].shape[1])*100}% of layer {i}")
 
 
-	IS_CF_DL.ann.setWeights(weights)
+	IS_CF_DNN.ann.setWeights(weights)
 	# save model
 
 	# Testing Phase
-	IS_CF_DL.switchMode()
-	Yhat = IS_CF_DL.ann.predict(Xtest)
+	IS_CF_DNN.switchMode()
+	Yhat = IS_CF_DNN.ann.predict(Xtest)
 	f1_score = f1_m(np.array(Ytest, dtype="float32"), np.array(Yhat, dtype="float32")).numpy()
 
-	return IS_CF_DL, f1_score
+	return IS_CF_DNN, f1_score
 
 def cv_hparam(args):
+	_CACHED_load_surface_data=None
 	seed(39)
 	seeds = [randint(0,1000) for _ in range(0,args.cv_folds)]
 
@@ -215,7 +233,8 @@ def cv_hparam(args):
 		print('Producing model with given seed only!')
 		seeds = [args.seed]
 
-	h_param = {'threshold':[0.005, 0.01, 0.05], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
+	# h_param = {'threshold':[0.005, 0.01, 0.05], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
+	h_param = {'prune':[10, 25, 50, 75, 90], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
 
 	def cross(h_param):
 		comb = []
@@ -237,7 +256,12 @@ def cv_hparam(args):
 	h_param = cross(h_param)
 
 	def get_hparam(args):
-		return f"threshold={args.threshold},layer={args.layer}"
+		s = f""
+		for k in d.keys():
+			s+= f"{k}={getattr(args,k)},"
+		s = s[:-1]
+
+		return s
 
 	scores = {}
 	models = {}
@@ -245,8 +269,11 @@ def cv_hparam(args):
 		scores = pickle.load(open('CF_scores.pkl', 'rb'))
 
 	for d in h_param:
-		args.threshold=d['threshold']
-		args.layer=d['layer']
+		# args.threshold=d['threshold']
+		# args.layer=d['layer']
+
+		for k,v in d.items():
+			setattr(args,k,v)
 
 		if get_hparam(args) not in scores:
 			scores[get_hparam(args)]={}
@@ -256,18 +283,22 @@ def cv_hparam(args):
 			if s in scores[get_hparam(args)] and args.seed is None:
 				s = randint(0,1000)
 
-			X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(s, True, split=0.1)
+			if _CACHED_load_surface_data is None:
+				X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _, _CACHED_load_surface_data = load_surface_data(s, True, split=0.1)
+			else:
+				X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data[seed]
 
 			tf.random.set_seed(s)
 			np.random.seed(s)
 
-			IS_CF_DL, f1_score = CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
+			IS_CF_DNN, f1_score = CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
 			
 			scores[get_hparam(args)][s]=f1_score
-			models[get_hparam(args)][s]=IS_CF_DL
+			models[get_hparam(args)][s]=IS_CF_DNN
 
 			pickle.dump(scores, open('CF_scores.pkl','wb'))
 
+			print('Latest score with params '+get_hparam(args)+':'+str(f1_score))
 			print(scores)
 
 	return scores, models
@@ -275,9 +306,10 @@ def cv_hparam(args):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-e', '--epochs', type=int, default=50, help='How many epochs to run in first phase?')
-	parser.add_argument('-p', '--epochs_cf', type=int, default=50, help='How many epochs to run in second phase?')
+	parser.add_argument('-c', '--epochs_cf', type=int, default=50, help='How many epochs to run in second phase?')
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size during training per GPU')
-	parser.add_argument('-t', '--threshold', type=float, default=0.01, help='threshold of updating the weights')
+	# parser.add_argument('-t', '--threshold', type=float, default=0.01, help='threshold of updating the weights')
+	parser.add_argument('-p', '--prune', type=int, default=10, help='percentage of weights to prune in phase 3; val: 0-100')
 	parser.add_argument('-f', '--cv_folds', type=int, default=7, help='number of cross validation folds')
 	parser.add_argument('-s', '--seed', type=int, default=None, help='seed')
 	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2', 'fc3'], help='the layer we are interested in adjust')
