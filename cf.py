@@ -81,6 +81,9 @@ class CF_DNN(object):
 			self.model_z._name = 'IS_Ann_Z'
 			self.model_z.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
 
+			# self.model_yz = ModelPlus(inputs=inputs, outputs=[out_y,out_z])
+			# self.model_yz.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
+
 		self.setMode('model_y')
 
 		self.model_y.summary()
@@ -125,13 +128,27 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 
 	IS_CF_DNN = CF_DNN(x_shape=dim_features, y_shape=num_class, z_shape=z_shape, model_shape=(606,303,606))
 
-	# Phase One
+	# IS_CF_DNN.model_y.get_layer('fc1').set_weights([np.zeros((480,606)),np.random.rand(606)])
+
+	# print('!'*5+"ANALYSIS OF WEIGHTS BEFORE CF WEIGHT CLIPPING"+'!'*5)
+	# for layer in IS_CF_DNN.model_y.layers:
+	# 	print(layer.name)
+	# 	if len(layer.get_weights())!=0:
+	# 		w, _ = layer.get_weights()
+	# 		print('Weights:',w)
+	# 		print(w.shape)
+	# 		num_zero = len(np.where(w==0)[1])
+	# 		w_size = w.size
+	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
+
+
+	# Phase 1: Target Output Training ie. Model Training
 	print('='*30)
 	print('Phase One')
 	print('1'*30)
 	print('='*30)
 
-	history = IS_CF_DNN.ann.fit(
+	history = IS_CF_DNN.model_y.fit(
 		Xtrain,
 		Ytrain,
 		epochs=args.epochs,
@@ -141,15 +158,16 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 		]
 	)
-	weights = IS_CF_DNN.ann.getWeights(layers=args.layer)
+	weights = IS_CF_DNN.model_y.getWeights(layers=args.layer)
 
-	# Phase Two
+
+	# Phase 2: Confounder Output Training
 	print('='*30)
 	print('Phase Two')
 	print('2'*30)
 	print('='*30)
 
-	weight_pre = IS_CF_DNN.ann.getWeights(layers=args.layer)
+	weight_pre = IS_CF_DNN.model_y.getWeights(layers=args.layer)
 
 	def hof_None_check(func):
 		def hof(i):
@@ -162,13 +180,18 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	esc = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 	wtc = WeightTrackerCallback(weight_pre, changes, args.layer)
 
-	IS_CF_DNN.switchMode()
-	IS_CF_DNN.ann.freezeOtherWeights(layers=args.layer)
+	# IS_CF_DNN.switchMode()
+
+	########
+	# IS_CF_DNN.model_z.freezeOtherWeights(layers=args.layer)
+	########
 
 	ohe = OneHotEncoder()
 	Ptrain_oh = ohe.fit_transform(Ptrain.reshape(-1, 1)).toarray()
 
-	history = IS_CF_DNN.ann.fit(
+	IS_CF_DNN.model_z.summary()
+
+	history = IS_CF_DNN.model_z.fit(
 		Xtrain,
 		Ptrain_oh,
 		epochs=args.epochs_cf,
@@ -183,13 +206,12 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	norm_func = lambda x: x/(esc.stopped_epoch*num_batches)
 	norm_changes = list(map(hof_None_check(norm_func), wtc.changes))
 
-	# Phase Three
+
+	# Phase 3: Selective Weight Pruning
 	print('='*30)
 	print('Phase Three')
 	print('3'*30)
 	print('='*30)
-
-	# prune_percent = 10 # prunes the top X% highest contributing connections to identity
 
 	for i, nc in enumerate(norm_changes):
 		if weights[i] is not None and nc is not None:
@@ -200,20 +222,67 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			# plt.show()
 
 			# prunes the top X% highest contributing connections to identity
-			percent_threshold = np.percentile(nc, 100-args.prune)
-			indices = np.where(nc > percent_threshold)[0]
+			percent_threshold = np.percentile(nc.flatten(), 100-args.prune)
+			# indices = np.where(nc > percent_threshold)[0]
 			# indices = np.where(nc > args.threshold)[0]
 		
-			weights[i].put(indices, 0)
-			print(f"Pruned {indices.shape[0]/(weights[i].shape[0]*weights[i].shape[1])*100}% of layer {i}")
+			# weights[i].put(indices, 0)
+			weights[i][nc>percent_threshold] = 0
+			# print(f"'Pruned' {indices.size}/{weights[i].size}={indices.size*100/weights[i].size}% of layer {i}")
 
+			num_zero = len(np.where(weights[i]==0)[1])
+			w_size = weights[i].size
+			print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
 
-	IS_CF_DNN.ann.setWeights(weights)
+	# print('Checking weight arr directly')
+	# for w in weights:
+	# 	if w is not None:
+	# 		num_zero = len(np.where(w==0)[1])
+	# 		w_size = w.size
+	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
+
+	# print('!'*5+"ANALYSIS OF WEIGHTS BEFORE CF WEIGHT CLIPPING"+'!'*5)
+	# for layer in IS_CF_DNN.model_y.layers:
+	# 	print(layer.name)
+	# 	if len(layer.get_weights())!=0:
+	# 		w, _ = layer.get_weights()
+	# 		print('Weights:',w)
+	# 		print(w.shape)
+	# 		num_zero = len(np.where(w==0)[1])
+	# 		w_size = w.size
+	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
+
+	IS_CF_DNN.model_y.setWeights(weights)
 	# save model
 
-	# Testing Phase
-	IS_CF_DNN.switchMode()
-	Yhat = IS_CF_DNN.ann.predict(Xtest)
+	# Phase 4: Testing
+	# IS_CF_DNN.switchMode()
+
+	# IS_CF_DNN.model_y.get_layer('fc1').set_weights([np.zeros((480,606)),np.random.rand(606)])
+
+	# print('!'*5+"ANALYSIS OF MODEL_Y WEIGHTS AFTER CF WEIGHT CLIPPING"+'!'*5)
+	# for layer in IS_CF_DNN.model_y.layers:
+	# 	print(layer.name)
+	# 	if len(layer.get_weights())!=0:
+	# 		w, _ = layer.get_weights()
+	# 		print('Weights:',w)
+	# 		print(w.shape)
+	# 		num_zero = len(np.where(w==0)[1])
+	# 		w_size = w.size
+	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
+
+	# print('!'*5+"ANALYSIS OF MODEL_Z WEIGHTS AFTER CF WEIGHT CLIPPING"+'!'*5)
+	# for layer in IS_CF_DNN.model_z.layers:
+	# 	print(layer.name)
+	# 	if len(layer.get_weights())!=0:
+	# 		w, _ = layer.get_weights()
+	# 		print('Weights:',w)
+	# 		print(w.shape)
+	# 		num_zero = len(np.where(w==0)[1])
+	# 		w_size = w.size
+	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
+
+	Yhat = IS_CF_DNN.model_y.predict(Xtest)
 	f1_score = f1_m(np.array(Ytest, dtype="float32"), np.array(Yhat, dtype="float32")).numpy()
 
 	return IS_CF_DNN, f1_score
@@ -228,7 +297,7 @@ def cv_hparam(args):
 		seeds = [args.seed]
 
 	# h_param = {'threshold':[0.005, 0.01, 0.05], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
-	h_param = {'prune':[10, 25, 50, 75, 90], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
+	h_param = {'prune':[10, 25, 50, 75, 90, 0], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
 
 	def cross(h_param):
 		comb = []
@@ -249,6 +318,9 @@ def cv_hparam(args):
 
 	h_param = cross(h_param)
 
+	if args.seed is not None:
+		h_param = [{'prune':args.prune, 'layer':args.layer}]
+
 	def get_hparam(args):
 		s = f""
 		for k in d.keys():
@@ -259,7 +331,7 @@ def cv_hparam(args):
 
 	scores = {}
 	models = {}
-	if path.exists('out/CF_scores.pkl'):
+	if path.exists('out/CF_scores.pkl') and args.seed is None:
 		scores = pickle.load(open('out/CF_scores.pkl', 'rb'))
 
 	for s in seeds:
@@ -288,7 +360,8 @@ def cv_hparam(args):
 			scores[get_hparam(args)][s]=f1_score
 			models[get_hparam(args)][s]=IS_CF_DNN
 
-			pickle.dump(scores, open('out/CF_scores.pkl','wb'))
+			if args.seed is None:
+				pickle.dump(scores, open('out/CF_scores.pkl','wb'))
 
 			print('Latest score with params '+get_hparam(args)+':'+str(f1_score))
 			print(scores)
@@ -304,10 +377,10 @@ if __name__ == "__main__":
 	parser.add_argument('-c', '--epochs_cf', type=int, default=50, help='How many epochs to run in second phase?')
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size during training per GPU')
 	# parser.add_argument('-t', '--threshold', type=float, default=0.01, help='threshold of updating the weights')
-	parser.add_argument('-p', '--prune', type=int, default=10, help='percentage of weights to prune in phase 3; val: 0-100')
+	parser.add_argument('-p', '--prune', type=int, default=20, help='percentage of weights to prune in phase 3; val: 0-100')
 	parser.add_argument('-f', '--cv_folds', type=int, default=7, help='number of cross validation folds')
 	parser.add_argument('-s', '--seed', type=int, default=None, help='seed')
-	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2', 'fc3'], help='the layer we are interested in adjust')
+	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2'], help='the layer we are interested in adjust')
 	args = parser.parse_args()
 
 	seed(39)
