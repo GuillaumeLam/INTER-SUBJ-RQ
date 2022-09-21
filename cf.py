@@ -54,10 +54,10 @@ class ModelPlus(Model):
 				_, bias = layer.get_weights()
 				layer.set_weights([weight, bias])
 
-	def freezeOtherWeights(self, layers=['fc2']):
-		for layer in self.layers:
-			if layer.name not in layers:
-				layer.trainable = False
+	# def freezeOtherWeights(self, layers=['fc2']):
+	# 	for layer in self.layers:
+	# 		if layer.name not in layers:
+	# 			layer.trainable = False
 
 
 class CF_DNN(object):
@@ -84,23 +84,10 @@ class CF_DNN(object):
 			# self.model_yz = ModelPlus(inputs=inputs, outputs=[out_y,out_z])
 			# self.model_yz.compile(optimizer='adam',loss='categorical_crossentropy',metrics=['acc', f1_m])
 
-		self.setMode('model_y')
-
 		self.model_y.summary()
 
 		if z_shape is not None:
 			self.model_z.summary()
-
-	def setMode(self, mode):
-		self.ann = getattr(self, mode)
-		self.mode = mode
-		print('Switched to ', mode)
-
-	def switchMode(self):
-		if self.mode == 'model_y':
-			self.setMode('model_z')
-		else:
-			self.setMode('model_y')
 
 
 class WeightTrackerCallback(tf.keras.callbacks.Callback):
@@ -121,25 +108,12 @@ class WeightTrackerCallback(tf.keras.callbacks.Callback):
 		self.weight_pre = weight
 
 
-def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
+def Wang_et_al_CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	dim_features = (480)
 	num_class = 9
 	z_shape = len(set(Ptrain))
 
 	IS_CF_DNN = CF_DNN(x_shape=dim_features, y_shape=num_class, z_shape=z_shape, model_shape=(606,303,606))
-
-	# IS_CF_DNN.model_y.get_layer('fc1').set_weights([np.zeros((480,606)),np.random.rand(606)])
-
-	# print('!'*5+"ANALYSIS OF WEIGHTS BEFORE CF WEIGHT CLIPPING"+'!'*5)
-	# for layer in IS_CF_DNN.model_y.layers:
-	# 	print(layer.name)
-	# 	if len(layer.get_weights())!=0:
-	# 		w, _ = layer.get_weights()
-	# 		print('Weights:',w)
-	# 		print(w.shape)
-	# 		num_zero = len(np.where(w==0)[1])
-	# 		w_size = w.size
-	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
 
 
 	# Phase 1: Target Output Training ie. Model Training
@@ -180,8 +154,6 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 	esc = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=5, mode="min",restore_best_weights=True)
 	wtc = WeightTrackerCallback(weight_pre, changes, args.layer)
 
-	# IS_CF_DNN.switchMode()
-
 	########
 	# IS_CF_DNN.model_z.freezeOtherWeights(layers=args.layer)
 	########
@@ -221,66 +193,15 @@ def CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			# plt.title('Histogram of normalized weight changes')
 			# plt.show()
 
-			# prunes the top X% highest contributing connections to identity
+			# prunes the top X% highest contributing connections to confounder
 			percent_threshold = np.percentile(nc.flatten(), 100-args.prune)
-			# indices = np.where(nc > percent_threshold)[0]
-			# indices = np.where(nc > args.threshold)[0]
-		
-			# weights[i].put(indices, 0)
 			weights[i][nc>percent_threshold] = 0
-			# print(f"'Pruned' {indices.size}/{weights[i].size}={indices.size*100/weights[i].size}% of layer {i}")
 
 			num_zero = len(np.where(weights[i]==0)[1])
 			w_size = weights[i].size
 			print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
 
-	# print('Checking weight arr directly')
-	# for w in weights:
-	# 	if w is not None:
-	# 		num_zero = len(np.where(w==0)[1])
-	# 		w_size = w.size
-	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
-
-	# print('!'*5+"ANALYSIS OF WEIGHTS BEFORE CF WEIGHT CLIPPING"+'!'*5)
-	# for layer in IS_CF_DNN.model_y.layers:
-	# 	print(layer.name)
-	# 	if len(layer.get_weights())!=0:
-	# 		w, _ = layer.get_weights()
-	# 		print('Weights:',w)
-	# 		print(w.shape)
-	# 		num_zero = len(np.where(w==0)[1])
-	# 		w_size = w.size
-	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
-
 	IS_CF_DNN.model_y.setWeights(weights)
-	# save model
-
-	# Phase 4: Testing
-	# IS_CF_DNN.switchMode()
-
-	# IS_CF_DNN.model_y.get_layer('fc1').set_weights([np.zeros((480,606)),np.random.rand(606)])
-
-	# print('!'*5+"ANALYSIS OF MODEL_Y WEIGHTS AFTER CF WEIGHT CLIPPING"+'!'*5)
-	# for layer in IS_CF_DNN.model_y.layers:
-	# 	print(layer.name)
-	# 	if len(layer.get_weights())!=0:
-	# 		w, _ = layer.get_weights()
-	# 		print('Weights:',w)
-	# 		print(w.shape)
-	# 		num_zero = len(np.where(w==0)[1])
-	# 		w_size = w.size
-	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
-
-	# print('!'*5+"ANALYSIS OF MODEL_Z WEIGHTS AFTER CF WEIGHT CLIPPING"+'!'*5)
-	# for layer in IS_CF_DNN.model_z.layers:
-	# 	print(layer.name)
-	# 	if len(layer.get_weights())!=0:
-	# 		w, _ = layer.get_weights()
-	# 		print('Weights:',w)
-	# 		print(w.shape)
-	# 		num_zero = len(np.where(w==0)[1])
-	# 		w_size = w.size
-	# 		print(f"% of 0's: {num_zero}/{w_size}={num_zero*100/w_size}%")
 
 	Yhat = IS_CF_DNN.model_y.predict(Xtest)
 	f1_score = f1_m(np.array(Ytest, dtype="float32"), np.array(Yhat, dtype="float32")).numpy()
@@ -355,7 +276,7 @@ def cv_hparam(args):
 			tf.random.set_seed(s)
 			np.random.seed(s)
 
-			IS_CF_DNN, f1_score = CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
+			IS_CF_DNN, f1_score = Wang_et_al_CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
 			
 			scores[get_hparam(args)][s]=f1_score
 			models[get_hparam(args)][s]=IS_CF_DNN
@@ -377,7 +298,7 @@ if __name__ == "__main__":
 	parser.add_argument('-c', '--epochs_cf', type=int, default=50, help='How many epochs to run in second phase?')
 	parser.add_argument('-b', '--batch_size', type=int, default=64, help='Batch size during training per GPU')
 	# parser.add_argument('-t', '--threshold', type=float, default=0.01, help='threshold of updating the weights')
-	parser.add_argument('-p', '--prune', type=int, default=20, help='percentage of weights to prune in phase 3; val: 0-100')
+	parser.add_argument('-p', '--prune', type=int, default=20, help='prunes the top X%  highest contributing connections to confounder; val: 0-100')
 	parser.add_argument('-f', '--cv_folds', type=int, default=7, help='number of cross validation folds')
 	parser.add_argument('-s', '--seed', type=int, default=None, help='seed')
 	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2'], help='the layer we are interested in adjust')
