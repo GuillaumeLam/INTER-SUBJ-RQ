@@ -25,11 +25,11 @@ def _CACHED_load_surface_data(seed, *args, **kwargs):
 		_cached_Irregular_Surface_Dataset = pickle.load(open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','rb'))
 
 		if seed in _cached_Irregular_Surface_Dataset:
-			print(f"CACHE HIT FOR SEED#{seed}")
+			print(f"DATASET CACHE HIT FOR SEED#{seed}")
 			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _cached_Irregular_Surface_Dataset[seed]
 			return X_tr, Y_tr, P_tr, X_te, Y_te, P_te
 		else:
-			print(f"CACHE MISS FOR SEED#{seed}")
+			print(f"DATASET CACHE MISS FOR SEED#{seed}")
 			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = load_surface_data(seed, *args, **kwargs)
 			# _cached_Irregular_Surface_Dataset[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
 			# pickle.dump(_cached_Irregular_Surface_Dataset,open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','wb'))
