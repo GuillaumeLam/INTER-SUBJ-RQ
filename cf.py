@@ -108,7 +108,7 @@ class WeightTrackerCallback(tf.keras.callbacks.Callback):
 		self.weight_pre = weight
 
 
-def Wang_et_al_CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
+def Wang_et_al_CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain, rnd_prune=False):
 	dim_features = (480)
 	num_class = 9
 	z_shape = len(set(Ptrain))
@@ -193,9 +193,18 @@ def Wang_et_al_CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 			# plt.title('Histogram of normalized weight changes')
 			# plt.show()
 
-			# prunes the top X% highest contributing connections to confounder
-			percent_threshold = np.percentile(nc.flatten(), 100-args.prune)
-			weights[i][nc>percent_threshold] = 0
+
+			if rnd_prune:
+				print(f"RANDOM WEIGHTS SET TO 0")
+				# set args.prune% of weights[i]'s weights to 0
+				indices = np.random.choice(weights[i].size, replace=False, size=int(weights[i].size*args.prune/100))
+				weights[i][np.unravel_index(indices, weights[i].shape)] = 0
+			else:
+				# prunes the top X% highest contributing connections to confounder
+				percent_threshold = np.percentile(nc.flatten(), 100-args.prune)
+				weights[i][nc>percent_threshold] = 0
+
+			# test random number of weights to 0
 
 			num_zero = len(np.where(weights[i]==0)[1])
 			w_size = weights[i].size
@@ -211,6 +220,8 @@ def Wang_et_al_CF(args, Xtrain, Ytrain, Xtest, Ytest, Ptrain):
 def cv_hparam(args):
 	global _cached_Irregular_Surface_Dataset
 
+	score_path = ('out/CF_scores_rnd.pkl' if args.rnd_prune else 'out/CF_scores.pkl')
+
 	seeds = [randint(0,1000) for _ in range(0,args.cv_folds)]
 
 	if args.seed is not None:
@@ -218,7 +229,7 @@ def cv_hparam(args):
 		seeds = [args.seed]
 
 	# h_param = {'threshold':[0.005, 0.01, 0.05], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
-	h_param = {'prune':[10, 25, 50, 75, 90, 0], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
+	h_param = {'prune':[0, 10, 25, 50, 75, 90], 'layer': [['fc1'],['fc2'],['fc3'],['fc1','fc2'],['fc1','fc3'],['fc2','fc3'],['fc1','fc2','fc3']]}
 
 	def cross(h_param):
 		comb = []
@@ -252,8 +263,8 @@ def cv_hparam(args):
 
 	scores = {}
 	models = {}
-	if path.exists('out/CF_scores.pkl') and args.seed is None:
-		scores = pickle.load(open('out/CF_scores.pkl', 'rb'))
+	if path.exists(score_path) and args.seed is None:
+		scores = pickle.load(open(score_path, 'rb'))
 
 	for s in seeds:
 		hit = 0
@@ -276,13 +287,13 @@ def cv_hparam(args):
 			tf.random.set_seed(s)
 			np.random.seed(s)
 
-			IS_CF_DNN, f1_score = Wang_et_al_CF(args, X_tr, Y_tr, X_te, Y_te, P_tr)
+			IS_CF_DNN, f1_score = Wang_et_al_CF(args, X_tr, Y_tr, X_te, Y_te, P_tr, rnd_prune=args.rnd_prune)
 			
 			scores[get_hparam(args)][s]=f1_score
 			models[get_hparam(args)][s]=IS_CF_DNN
 
 			if args.seed is None:
-				pickle.dump(scores, open('out/CF_scores.pkl','wb'))
+				pickle.dump(scores, open(score_path,'wb'))
 
 			print('Latest score with params '+get_hparam(args)+':'+str(f1_score))
 			print(scores)
@@ -302,6 +313,7 @@ if __name__ == "__main__":
 	parser.add_argument('-f', '--cv_folds', type=int, default=7, help='number of cross validation folds')
 	parser.add_argument('-s', '--seed', type=int, default=None, help='seed')
 	parser.add_argument('-n', '--layer', nargs='+', default=['fc1', 'fc2'], help='the layer we are interested in adjust')
+	parser.add_argument('-r', '--rnd_prune', type=bool, default=False, help='Prune weights randomly?')
 	args = parser.parse_args()
 
 	seed(39)
