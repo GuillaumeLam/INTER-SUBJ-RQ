@@ -17,6 +17,7 @@ def lda_featuers(x_train,y_train):
 	return x_train,lda
 
 # measure size of each dataset and account based on max mem. (if you can only cache 2 but want 4 folds, iterrate params faster than cached dataset)
+# input for file size (nxdataset-seed) and in ram
 def _CACHED_load_surface_data(seed, *args, **kwargs):
 	global _cached_Irregular_Surface_Dataset
 
@@ -31,10 +32,6 @@ def _CACHED_load_surface_data(seed, *args, **kwargs):
 		else:
 			print(f"DATASET CACHE MISS FOR SEED#{seed}")
 			X_tr, Y_tr, P_tr, X_te, Y_te, P_te = load_surface_data(seed, *args, **kwargs)
-			# _cached_Irregular_Surface_Dataset[seed] = (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
-			# pickle.dump(_cached_Irregular_Surface_Dataset,open('dataset/DTST:IRREGSURF_NORM_LDA-cache.pkl','wb'))
-			# # _cached_Irregular_Surface_Dataset[s]= (X_tr, Y_tr, P_tr, X_te, Y_te, P_te)
-			# print(f"ADDING SEEDED DATASET-{seed} TO CACHE")
 	else:
 		print('NO DATASET CACHE')
 		X_tr, Y_tr, P_tr, X_te, Y_te, P_te = load_surface_data(seed, *args, **kwargs)
