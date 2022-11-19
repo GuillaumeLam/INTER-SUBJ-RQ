@@ -104,6 +104,14 @@ def calibrated_line(model, X_test, Y_test, P_test, seed, freeze):
 	return label_f1, calib_sizes, calibrated_model
 
 def calib_data(cv=1, freeze=False, holdout=False):
+	# !!TODO!!:
+	# -graph f1 of all train & eval of sizes for both data splits
+	# -double check what is going on with a single participant with both types of spliting?
+
+	# -rank ppl in dataset by how many gait cycles per label min. (dont make sorting func, make comparison func which returns min # for both and all extra cycles trimmed) then observe learning with increasing amounts. collect F1-scores to compare differences as amount increases. graph diff's btwn sizes (also graph change of weights? but how/what to show this?)
+	# -make graph per person & average out
+	# -what about performance of past mastered ppl (use trimed gait cycles to check in terms of ppl ago)
+
 	global _cached_Irregular_Surface_Dataset
 	_cached_Irregular_Surface_Dataset=None
 
@@ -119,6 +127,12 @@ def calib_data(cv=1, freeze=False, holdout=False):
 
 	for i,s in enumerate(seeds):
 
+		#==Make artificial dataset to mimic situation: 
+		#use decoder of gait running pattern (use measure of diff for signal to noise ratio...?) 
+		# with rnd inpt patterns for sensors with sometimes delay and some rnd error; comparison with other dataset 
+		# -> test idea of areas of perturbation zones with two labels
+		# vary cluster of decoder input (find perpendicular dimentional variations)
+		# need: tunable personal variation and for diff ppl variation & difference in labels that is learnable (ie. not random; but not 100% either, correct is 75% & opposite is 25%)
 		X_tr, Y_tr, P_tr, X_te, Y_te, P_te, _ = load_surface_data(s, False, split=0.1)
 		rw_result, _, _ = single_run(X_tr, Y_tr, X_te, Y_te)
 
@@ -126,6 +140,8 @@ def calib_data(cv=1, freeze=False, holdout=False):
 		
 		if holdout:
 			X_tr, Y_tr, X_hold, Y_hold, P_tr, P_hold = subject_wise_split(X_tr, Y_tr, P_tr, split=0.1, seed=s, subject_wise=True)
+		#============
+
 		sw_result, sw_model, (X_te, Y_te) = single_run(lab, X_tr, Y_tr, X_te, Y_te)
 
 		rw = rw_result['F1_classes']
