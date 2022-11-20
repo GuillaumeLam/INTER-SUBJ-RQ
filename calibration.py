@@ -282,8 +282,8 @@ def graph_f1_calib(label_f1, sw_f1, rw_f1, calib_sizes, detail, model_id, log_sc
 
 		plt.plot(0, np.mean(sw_f1), 'go',label='subject-wise')
 		plt.plot(calib_sizes[-1], np.mean(rw_f1), 'ro', label='random-wise')
-		plt.errorbar(0, np.mean(sw_f1), ecolor='green', yerr=np.std(sw_f1))
-		plt.errorbar(calib_sizes[-1], np.mean(rw_f1), ecolor='red', yerr=np.std(rw_f1))
+		plt.errorbar(0, np.mean(sw_f1), ecolor='green', yerr=np.std(sw_f1), capsize=10)
+		plt.errorbar(calib_sizes[-1], np.mean(rw_f1), ecolor='red', yerr=np.std(rw_f1), capsize=5)
 
 		plt.legend(loc='lower right')
 		plt.grid(linestyle='--', linewidth=0.5)
