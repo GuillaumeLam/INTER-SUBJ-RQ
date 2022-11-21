@@ -2,13 +2,16 @@
 
 import sys
 
-import numpy as np
 from sklearn.metrics import f1_score
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 
 import copy
-from sklearn.metrics import classification_report
-import tensorflow as tf
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+
+# from subject_wise_split import subject_wise_split
 
 #======================>
 #  Exported Functions  >
@@ -24,24 +27,56 @@ import matplotlib.pyplot as plt
 #	-array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def partic_calib_curve(model, P_X, P_Y):
-	per_label_dict, min_cycles = perLabelDict(P_X, P_Y)
+# TODO: silence warning if no issue w/ real data
+
+def partic_calib_curve(model, P_X, P_Y, seed=39):
+	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles
 
 	f1_curves_per_label = []
 	n_labels = len(per_label_dict.keys())
 
 	i = 1
 
-	for label in per_label_dict.keys():
-		# order per_label_dict.keys()
+	n_labels = len(per_label_dict.keys())
 
-		# train model on 1..n gait cycles & eval on else (always keep min 10% for eval)
-			# X -> per_label_dict[label]
-			# Y -> one_hot(label, n_labels) * len(X)
+	nl_counter = 0
 
-		f1_curve = [(8+i)]*min_cycles # TO REPLACE
-		i+=1
+	for pos_y, X in per_label_dict.items():		# ordered labels
+		Y = [0]*n_labels
+		Y[pos_y] = 1
+		Y = np.array([Y]*X.shape[0])
+
+		X_tr, X_te, Y_tr, Y_te= train_test_split(X, Y, test_size=0.1, random_state=seed) # update subject_wise_split to not take P/ =None if subject_wise=False
+
+		f1_curve = []
+		# train model on 1..n gait cycles & eval on else
+		for i in range(len(X_tr)):
+			model_cpy = keras_model_cpy(model)
+			
+			if i > 0:
+
+				CX = X_tr[:i]
+				CY = Y_tr[:i]
+
+				model_cpy.fit(CX, CY, epochs=50,batch_size=1, verbose=0)
+
+			mult_pred = model_cpy.predict(X_te, verbose=0)
+
+			y_hat = np.zeros_like(mult_pred)
+			y_hat[np.arange(len(mult_pred)), mult_pred.argmax(1)] = 1
+
+			report_dict = classification_report(Y_te, y_hat, target_names=list(range(n_labels)), output_dict=True)
+
+			f1_curve.append(report_dict[pos_y]['f1-score'])
+
+			print(f'Itteration of X_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
+
+		# f1_curve = [(8+i)]*min_cycles # TO REPLACE
+		# i+=1
+
 		f1_curves_per_label.append(f1_curve)
+		nl_counter+=1
+		print(f'Itteration of participant completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
 
 	f1_matrix = pad_last_dim(f1_curves_per_label)
 
@@ -58,20 +93,22 @@ def partic_calib_curve(model, P_X, P_Y):
 #	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def avg_calib_curve(model,X,Y,P):
+def avg_calib_curve(model,X,Y,P,seed=39):
 	participants_dict = perParticipantDict(X, Y, P)
 
 	all_participants = []
 
 	# repeat partic_calib_curve over all participant
 	for p_id in participants_dict.keys():
-		all_participants.append(partic_calib_curve(model,*participants_dict[p_id]))
+		all_participants.append(partic_calib_curve(model,*participants_dict[p_id],seed))
 
 	all_participants = pad_last_dim(all_participants)
 
-	# average over participants (pad with last value [assumption: last value is highest] for shorter F1 vs C_tr arrays for all labels)
-	avg_f1_matrix = np.mean(all_participants, axis=0)
-	return avg_f1_matrix
+	# # average over participants (pad with last value [assumption: last value is highest F1] for shorter F1 vs C_tr arrays for all labels)
+	# avg_f1_matrix = np.mean(all_participants, axis=0)
+	# return avg_f1_matrix
+
+	return all_participants
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
@@ -169,3 +206,11 @@ def perParticipantDict(X, Y, P):
 		participants_dict[k] = (np.array(X),np.array(Y))
 
 	return participants_dict
+
+def keras_model_cpy(model):
+	model_cpy = tf.keras.models.clone_model(model)
+	model_cpy.build(model.input.shape)
+	model_cpy.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+	model_cpy.set_weights(model.get_weights())
+
+	return model_cpy

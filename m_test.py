@@ -2,6 +2,8 @@ import unittest
 
 # for tests
 import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers import Dense
 from load_data import load_surface_data, _CACHED_load_surface_data
 
 # exported methods
@@ -28,16 +30,24 @@ print('TIME TO HIT CACHE & SERVE:', e-s)
 class PaCalC_exported_func(unittest.TestCase):
 
 	def test_partic_calib_curve(self):
-		model = None
+		model = tf.keras.models.Sequential()
+		model.add(Dense(32, input_dim=100, activation='relu'))
+		model.add(Dense(16, activation='relu'))
+		model.add(Dense(2, activation='softmax'))
+
 		P_X, P_Y = np.zeros((50,100)), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
 		matrix = partic_calib_curve(model, P_X, P_Y)
-		self.assertEqual(matrix.shape, (2,25))
+		self.assertEqual(matrix.shape, (2,22)) # 2 bc |labels|=2; 22 bc 0.9*25=22
 
 	def test_avg_calib_curve(self):
-		model = None
+		model = tf.keras.models.Sequential()
+		model.add(Dense(32, input_dim=100, activation='relu'))
+		model.add(Dense(16, activation='relu'))
+		model.add(Dense(2, activation='softmax'))
+
 		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
 		matrix = avg_calib_curve(model, X, Y, P)
-		self.assertEqual(matrix.shape, (2,5))
+		self.assertEqual(matrix.shape, (5,2,4)) #5 bc |participants|=5; 2 bc |labels|=2; 22 bc 0.9*25=22
 
 	@unittest.expectedFailure
 	def test_graph_calib_curve_per_Y(self):
