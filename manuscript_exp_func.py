@@ -17,6 +17,8 @@ import tensorflow as tf
 #  Exported Functions  >
 #======================>
 
+# TO ADD: function for rnd seeds over 
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # partiç_calib_curve: generate F1 vs C_tr curves per label type for single participant
 # in:
@@ -27,7 +29,9 @@ import tensorflow as tf
 #	-array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# TODO: silence warning if no issue w/ real data
+# TODO: 
+# -silence warning if no issue w/ real data
+# -return min_cycles
 
 def partic_calib_curve(model, P_X, P_Y, seed=39):
 	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles
@@ -93,7 +97,10 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 #	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def avg_calib_curve(model,X,Y,P,seed=39):
+# TODO:
+# -return p_id with associated min_cycles
+
+def all_partic_calib_curve(model,X,Y,P,seed=39):
 	participants_dict = perParticipantDict(X, Y, P)
 
 	all_participants = []

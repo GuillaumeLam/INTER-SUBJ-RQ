@@ -7,7 +7,7 @@ from tensorflow.keras.layers import Dense
 from load_data import load_surface_data, _CACHED_load_surface_data
 
 # exported methods
-from manuscript_exp_func import partic_calib_curve, avg_calib_curve, graph_calib_curve_per_Y, graph_calib
+from manuscript_exp_func import partic_calib_curve, all_partic_calib_curve, graph_calib_curve_per_Y, graph_calib
 
 import manuscript_exp_func as PaCalC
 
@@ -39,14 +39,14 @@ class PaCalC_exported_func(unittest.TestCase):
 		matrix = partic_calib_curve(model, P_X, P_Y)
 		self.assertEqual(matrix.shape, (2,22)) # 2 bc |labels|=2; 22 bc 0.9*25=22
 
-	def test_avg_calib_curve(self):
+	def test_all_partic_calib_curve(self):
 		model = tf.keras.models.Sequential()
 		model.add(Dense(32, input_dim=100, activation='relu'))
 		model.add(Dense(16, activation='relu'))
 		model.add(Dense(2, activation='softmax'))
 
 		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
-		matrix = avg_calib_curve(model, X, Y, P)
+		matrix = all_partic_calib_curve(model, X, Y, P)
 		self.assertEqual(matrix.shape, (5,2,4)) #5 bc |participants|=5; 2 bc |labels|=2; 22 bc 0.9*25=22
 
 	@unittest.expectedFailure

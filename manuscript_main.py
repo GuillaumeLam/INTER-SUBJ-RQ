@@ -14,7 +14,7 @@ import manuscript_exp_func as mef
 
 irreg_surfaces_labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 
-# function to repeat partic_calib_curve & avg_calib_curve over multiple seeds
+# function to repeat partic_calib_curve & all_partic_calib_curve over multiple seeds
 
 def f1_vs_C_tr(seed=214):
 	global _cached_Irregular_Surface_Dataset
@@ -32,7 +32,7 @@ def f1_vs_C_tr(seed=214):
 	# train model on X_tr, Y_tr
 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
-	matrix = mef.avg_calib_curve(ann, X_te, Y_te, P_te)
+	matrix = mef.all_partic_calib_curve(ann, X_te, Y_te, P_te)
 
 	print(matrix)
 
