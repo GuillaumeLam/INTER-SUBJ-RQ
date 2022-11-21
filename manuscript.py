@@ -16,46 +16,46 @@ labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 #  Exported Functions
 #======================
 
+# p_calib_curve: generate F1 vs C_tr curves per label type for single participant
+# in:
+#	-model
+#	-participant features (X)
+#	-participant labels	(Y)
+# out:
+#	-array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 def p_calib_curve(model, P_X, P_Y):
 	return None
 
+# p_calib_curve: generate F1 vs C_tr curves per label type for all participants
+# in:
+#	-model
+#	-dataset features (X)
+#	-dataset labels	(Y)
+#	-dataset participant id (P)
+# out:
+#	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 def avg_calib_curve(model,X,Y,P):
 	return None
 
+# graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
+# in: 
+#	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
+# out:
+#	-graph of F1 vs C_tr per label type; dim: |unique(Y)|
 def graph_calib_curve_per_Y(curves):
 	return None
 
+# graph_calib_curve_per_Y: generate graph of F1 vs C_tr averaged over label type
+# in: 
+#	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
+# out:
+#	-graph of F1 vs C_tr; dim: 1
 def graph_calib(curves):
 	return None
 
-#====================
-#  Helper Functions
-#====================
-
-
-# perLabel: make dict of gait cycles per label of participant
-# return: 
-# 		dict of gait cycles per label, 
-# 		min number of gait cycles of all labels
-def perLabel(P_XY):
-	P_X, P_Y = P_XY
-	label_dict = {}
-
-	for i, y in enumerate(P_Y):
-		print
-		o_h_surface = y.argmax()
-		if not o_h_surface in label_dict:
-			label_dict[o_h_surface] = []
-
-		label_dict[o_h_surface].append(P_X[i])
-
-	min_cycles = 1000
-
-	for i in range(0,len(labels)):
-		if min_cycles > np.array(label_dict[i]).shape[0]:
-			min_cycles = np.array(label_dict[i]).shape[0]
-
-	return label_dict, min_cycles
+#======================
+#  Internal Functions
+#======================
 
 def per_label_calib(sw_tr_model, sw_te):
 	X_te, Y_te, P_te = sw_te
@@ -69,10 +69,8 @@ def per_label_calib(sw_tr_model, sw_te):
 		participants_dict[_id_][0].append(X_te[i])
 		participants_dict[_id_][1].append(Y_te[i])
 
-	# perLabel(participants_dict[1])
-
 	for p_id in participants_dict.keys():
-		per_label_dict, min_cycles = perLabel(participants_dict[p_id])
+		per_label_dict, min_cycles = perLabelDict(participants_dict[p_id])
 
 		print('P_id:',p_id)
 		print('MIN cycles:',min_cycles)
@@ -91,6 +89,33 @@ def per_label_calib(sw_tr_model, sw_te):
 
 # def graph_re()
 
+#====================
+#  Helper Functions
+#====================
+
+# perLabelDict: make dict of gait cycles per label of participant
+# return: 
+# 	-dict of gait cycles per label, 
+# 	-min number of gait cycles of all labels
+def perLabelDict(P_XY):
+	P_X, P_Y = P_XY
+	label_dict = {}
+
+	for i, y in enumerate(P_Y):
+		print
+		o_h_surface = y.argmax()
+		if not o_h_surface in label_dict:
+			label_dict[o_h_surface] = []
+
+		label_dict[o_h_surface].append(P_X[i])
+
+	min_cycles = 1000
+
+	for i in range(0,len(labels)):
+		if min_cycles > np.array(label_dict[i]).shape[0]:
+			min_cycles = np.array(label_dict[i]).shape[0]
+
+	return label_dict, min_cycles
 
 if __name__ == "__main__":
 	global _cached_Irregular_Surface_Dataset
