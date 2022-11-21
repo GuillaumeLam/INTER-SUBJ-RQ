@@ -39,7 +39,7 @@ def partic_calib_curve(model, P_X, P_Y):
 			# X -> per_label_dict[label]
 			# Y -> one_hot(label, n_labels) * len(X)
 
-		f1_curve = [(8+i)]*i # TO REPLACE
+		f1_curve = [(8+i)]*P_X.shape[-1] # TO REPLACE
 		i+=1
 		f1_curves_per_label.append(f1_curve)
 
@@ -65,13 +65,13 @@ def avg_calib_curve(model,X,Y,P):
 
 	# repeat partic_calib_curve over all participant
 	for p_id in participants_dict.keys():
-		all_participants.append(partic_calib_curve(*participants_dict[p_id]))
+		all_participants.append(partic_calib_curve(model,*participants_dict[p_id]))
 
-	all_participants = np.array(all_participants)
+	all_participants = pad_last_dim(all_participants)
 
 	# average over participants (pad with last value [assumption: last value is highest] for shorter F1 vs C_tr arrays for all labels)
-	avg_f1_matrix
-	return None
+	avg_f1_matrix = np.mean(all_participants, axis=0)
+	return avg_f1_matrix
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
@@ -98,22 +98,6 @@ def graph_calib(curves, text_labels=None):
 #====================>
 #  Helper Functions  >
 #====================>
-
-def perParticipantDict(X, Y, P):
-	participants_dict = {}
-
-	for i,_id_ in enumerate(P):
-		if not _id_ in participants_dict:
-			participants_dict[_id_] = ([],[]) # (P_X, P_Y)
-
-		participants_dict[_id_][0].append(X[i])
-		participants_dict[_id_][1].append(Y[i])
-
-	for k in participants_dict:
-		X,Y = participants_dict[k]
-		participants_dict[k] = (np.array(X),np.array(Y))
-
-	return participants_dict
 
 # perLabelDict: make dict of gait cycles per label of participant
 # in:
@@ -169,3 +153,19 @@ def pad_last_dim(arr):
 		matrix = np.append(matrix, np.array([padded_sub]), axis=0)
 
 	return matrix
+
+def perParticipantDict(X, Y, P):
+	participants_dict = {}
+
+	for i,_id_ in enumerate(P):
+		if not _id_ in participants_dict:
+			participants_dict[_id_] = ([],[]) # (P_X, P_Y)
+
+		participants_dict[_id_][0].append(X[i])
+		participants_dict[_id_][1].append(Y[i])
+
+	for k in participants_dict:
+		X,Y = participants_dict[k]
+		participants_dict[k] = (np.array(X),np.array(Y))
+
+	return participants_dict

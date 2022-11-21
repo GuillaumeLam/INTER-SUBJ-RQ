@@ -25,17 +25,33 @@ print('TIME TO HIT CACHE & SERVE:', e-s)
 
 # ==========
 
-class TDD_PaCalC(unittest.TestCase):
+class PaCalC_exported_func(unittest.TestCase):
 
-	def test_perParticipantDict(self):
+	def test_partic_calib_curve(self):
+		model = None
+		P_X, P_Y = np.zeros((50,100)), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
+		matrix = partic_calib_curve(model, P_X, P_Y)
+		self.assertEqual(matrix.shape, (2,100))
+
+	def test_avg_calib_curve(self):
+		model = None
 		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
+		matrix = avg_calib_curve(model, X, Y, P)
+		self.assertEqual(matrix.shape, (2,100))
 
-		d = PaCalC.perParticipantDict(X, Y, P)
+	@unittest.expectedFailure
+	def test_graph_calib_curve_per_Y(self):
+		curve = None
+		graph = graph_calib_curve_per_Y(curve)
+		self.assertNotEqual(graph, None)
 
-		for i,_id_ in enumerate(P):
-			(x, y) = d[_id_]
-			self.assertTrue((x == np.array([[0]*100]*10)).all())
-			self.assertTrue((y == np.array([[1,0]]*5+[[0,1]]*5)).all())
+	@unittest.expectedFailure
+	def test_graph_calib(self):
+		curve = None
+		graph = graph_calib(curve)
+		self.assertNotEqual(graph, None)
+
+class TDD_PaCalC(unittest.TestCase):
 
 	def test_perLabelDict(self):
 		P_X, P_Y = np.array([[0]*100]*10), np.array([[1,0]]*5+[[0,1]]*5)
@@ -84,31 +100,15 @@ class TDD_PaCalC(unittest.TestCase):
 
 		self.assertEqual(F1.shape, (2,n_labels,n_labels+1))
 
-class PaCalC_exported_func(unittest.TestCase):
+	def test_perParticipantDict(self):
+		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
 
-	def test_partic_calib_curve(self):
-		model = None
-		P_X, P_Y = np.zeros((50,100)), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
-		matrix = partic_calib_curve(model, P_X, P_Y)
-		self.assertEqual(matrix.shape[0], 2) # check that output has right # of labels
+		d = PaCalC.perParticipantDict(X, Y, P)
 
-	@unittest.expectedFailure
-	def test_avg_calib_curve(self):
-		model = None
-		res = avg_calib_curve(model, X_te, Y_te, P_te)
-		self.assertNotEqual(res, None)
-
-	@unittest.expectedFailure
-	def test_graph_calib_curve_per_Y(self):
-		curve = None
-		graph = graph_calib_curve_per_Y(curve)
-		self.assertNotEqual(graph, None)
-
-	@unittest.expectedFailure
-	def test_graph_calib(self):
-		curve = None
-		graph = graph_calib(curve)
-		self.assertNotEqual(graph, None)
+		for i,_id_ in enumerate(P):
+			(x, y) = d[_id_]
+			self.assertTrue((x == np.array([[0]*100]*10)).all())
+			self.assertTrue((y == np.array([[1,0]]*5+[[0,1]]*5)).all())
 
 if __name__ == '__main__':
 	unittest.main()
