@@ -31,13 +31,13 @@ class PaCalC_exported_func(unittest.TestCase):
 		model = None
 		P_X, P_Y = np.zeros((50,100)), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
 		matrix = partic_calib_curve(model, P_X, P_Y)
-		self.assertEqual(matrix.shape, (2,100))
+		self.assertEqual(matrix.shape, (2,25))
 
 	def test_avg_calib_curve(self):
 		model = None
 		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
 		matrix = avg_calib_curve(model, X, Y, P)
-		self.assertEqual(matrix.shape, (2,100))
+		self.assertEqual(matrix.shape, (2,5))
 
 	@unittest.expectedFailure
 	def test_graph_calib_curve_per_Y(self):

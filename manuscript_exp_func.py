@@ -35,11 +35,11 @@ def partic_calib_curve(model, P_X, P_Y):
 	for label in per_label_dict.keys():
 		# order per_label_dict.keys()
 
-		# train model on 1..n gait cycles & eval on else
+		# train model on 1..n gait cycles & eval on else (always keep min 10% for eval)
 			# X -> per_label_dict[label]
 			# Y -> one_hot(label, n_labels) * len(X)
 
-		f1_curve = [(8+i)]*P_X.shape[-1] # TO REPLACE
+		f1_curve = [(8+i)]*min_cycles # TO REPLACE
 		i+=1
 		f1_curves_per_label.append(f1_curve)
 
