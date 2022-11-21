@@ -4,7 +4,7 @@ import unittest
 from load_data import load_surface_data, _CACHED_load_surface_data
 
 # exported methods
-from manuscript import p_calib_curve, avg_calib_curve, graph_calib_curve_per_Y, graph_calib
+from manuscript_exp_func import p_calib_curve, avg_calib_curve, graph_calib_curve_per_Y, graph_calib
 
 # ==========
 # dataset
@@ -15,12 +15,12 @@ X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(214, True, split=
 
 # ==========
 
-class TDD(unittest.TestCase):
+class TDD_internal_func(unittest.TestCase):
 
 	def test_default(self):
 		self.assertEqual('foo'.upper(), 'FOO')
 
-class exported_methods(unittest.TestCase):
+class exported_func(unittest.TestCase):
 
 	@unittest.expectedFailure
 	def test_p_calib_curve(self):

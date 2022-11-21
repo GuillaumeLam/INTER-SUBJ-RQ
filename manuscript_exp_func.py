@@ -1,20 +1,18 @@
-from load_data import load_surface_data, _CACHED_load_surface_data
-from subject_wise_split import subject_wise_split
+# Participant Calibration Curve (PaCalC)
 
 import numpy as np
 from sklearn.metrics import f1_score
 
 import copy
-from random import seed, randint
 from sklearn.metrics import classification_report
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
 labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 
-#======================
-#  Exported Functions
-#======================
+#======================>
+#  Exported Functions  >
+#======================>
 
 # p_calib_curve: generate F1 vs C_tr curves per label type for single participant
 # in:
@@ -35,6 +33,8 @@ def p_calib_curve(model, P_X, P_Y):
 # out:
 #	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
 def avg_calib_curve(model,X,Y,P):
+	# repeat p_calib_curve over all participant
+	# average over participants (pad with last value [assumption: last value is highest] for shorter F1 vs C_tr arrays for all labels)
 	return None
 
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
@@ -53,9 +53,9 @@ def graph_calib_curve_per_Y(curves):
 def graph_calib(curves):
 	return None
 
-#======================
-#  Internal Functions
-#======================
+#======================>
+#  Internal Functions  >
+#======================>
 
 def per_label_calib(sw_tr_model, sw_te):
 	X_te, Y_te, P_te = sw_te
@@ -86,12 +86,11 @@ def per_label_calib(sw_tr_model, sw_te):
 
 # def repeated_eval(model, train_set, test_set, eval_schedule):
 
-
 # def graph_re()
 
-#====================
-#  Helper Functions
-#====================
+#====================>
+#  Helper Functions  >
+#====================>
 
 # perLabelDict: make dict of gait cycles per label of participant
 # return: 
@@ -109,18 +108,10 @@ def perLabelDict(P_XY):
 
 		label_dict[o_h_surface].append(P_X[i])
 
-	min_cycles = 1000
+	min_cycles = 100000
 
 	for i in range(0,len(labels)):
 		if min_cycles > np.array(label_dict[i]).shape[0]:
 			min_cycles = np.array(label_dict[i]).shape[0]
 
 	return label_dict, min_cycles
-
-if __name__ == "__main__":
-	global _cached_Irregular_Surface_Dataset
-	_cached_Irregular_Surface_Dataset=None
-
-	X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(214, True, split=0.1)
-
-	per_label_calib(None, (X_te, Y_te, P_te))
