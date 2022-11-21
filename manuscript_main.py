@@ -32,7 +32,15 @@ def f1_vs_C_tr(seed=214):
 	# train model on X_tr, Y_tr
 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
-	matrix = mef.all_partic_calib_curve(ann, X_te, Y_te, P_te)
+	#=================
+	# matrix = mef.all_partic_calib_curve(ann, X_te, Y_te, P_te)
+	#=================
+	# or quicker alternative
+	#=================
+	participants_dict = perParticipantDict(X, Y, P)
+	p_id = participants_dict.keys()[0]
+	matrix = mef.paritic_calib_curve(ann, *participants_dict[p_id])
+	#=================
 
 	print(matrix)
 
