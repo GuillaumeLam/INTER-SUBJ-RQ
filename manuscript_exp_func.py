@@ -75,9 +75,6 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 
 			print(f'Itteration of X_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
 
-		# f1_curve = [(8+i)]*min_cycles # TO REPLACE
-		# i+=1
-
 		f1_curves_per_label.append(f1_curve)
 		nl_counter+=1
 		print(f'Itteration of participant completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
