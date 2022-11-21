@@ -25,6 +25,8 @@ e = time.time()
 
 print('TIME TO HIT CACHE & SERVE:', e-s)
 
+np.random.seed(39)
+
 # ==========
 
 class PaCalC_exported_func(unittest.TestCase):
@@ -35,9 +37,9 @@ class PaCalC_exported_func(unittest.TestCase):
 		model.add(Dense(16, activation='relu'))
 		model.add(Dense(2, activation='softmax'))
 
-		P_X, P_Y = np.zeros((50,100)), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
+		P_X, P_Y = np.random.rand(50,100), np.array([[1,0]]*25+[[0,1]]*25) # replace None with 25 0's & 25 1's both ohe
 		matrix = partic_calib_curve(model, P_X, P_Y)
-		self.assertEqual(matrix.shape, (2,22)) # 2 bc |labels|=2; 22 bc 0.9*25=22
+		self.assertEqual(matrix.shape, (2,6))
 
 	def test_all_partic_calib_curve(self):
 		model = tf.keras.models.Sequential()
@@ -45,9 +47,9 @@ class PaCalC_exported_func(unittest.TestCase):
 		model.add(Dense(16, activation='relu'))
 		model.add(Dense(2, activation='softmax'))
 
-		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
+		X, Y, P = np.random.rand(50,100), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
 		matrix = all_partic_calib_curve(model, X, Y, P)
-		self.assertEqual(matrix.shape, (5,2,4)) #5 bc |participants|=5; 2 bc |labels|=2; 22 bc 0.9*25=22
+		self.assertEqual(matrix.shape, (5,2,4))
 
 	@unittest.expectedFailure
 	def test_graph_calib_curve_per_Y(self):
@@ -64,16 +66,15 @@ class PaCalC_exported_func(unittest.TestCase):
 class TDD_PaCalC(unittest.TestCase):
 
 	def test_perLabelDict(self):
-		P_X, P_Y = np.array([[0]*100]*10), np.array([[1,0]]*5+[[0,1]]*5)
+		P_X, P_Y = np.random.rand(10,100), np.array([[1,0]]*5+[[0,1]]*5)
 
 		d,m = PaCalC.perLabelDict(P_X, P_Y)
 
 		self.assertEqual(m,5) # 10 cyles btwn 2 labels => 5 cycles per label
 
-		for i, y in enumerate(P_Y):
+		for i, (y, p_x) in enumerate(d.items()):
 			pos_y = y.argmax()
-			p_x = d[pos_y]
-			self.assertTrue((p_x == P_X[i]).all())
+			self.assertTrue((p_x == np.array(P_X[i*5:(i*5+5),:])).all())
 
 	def test_pad_last_dim(self):
 		n_labels = 10
@@ -111,13 +112,13 @@ class TDD_PaCalC(unittest.TestCase):
 		self.assertEqual(F1.shape, (2,n_labels,n_labels+1))
 
 	def test_perParticipantDict(self):
-		X, Y, P = np.array([[0]*100]*50), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
+		X, Y, P = np.random.rand(50,100), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
 
 		d = PaCalC.perParticipantDict(X, Y, P)
 
-		for i,_id_ in enumerate(P):
-			(x, y) = d[_id_]
-			self.assertTrue((x == np.array([[0]*100]*10)).all())
+		for i, (_id_, xy) in enumerate(d.items()):
+			x, y = xy
+			self.assertTrue((x == np.array(X[i::5,:])).all())
 			self.assertTrue((y == np.array([[1,0]]*5+[[0,1]]*5)).all())
 
 if __name__ == '__main__':

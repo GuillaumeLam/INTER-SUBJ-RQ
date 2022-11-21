@@ -33,7 +33,7 @@ import tensorflow as tf
 # -silence warning if no issue w/ real data
 # -return min_cycles
 
-def partic_calib_curve(model, P_X, P_Y, seed=39):
+def partic_calib_curve(model, P_X, P_Y, seed=39, f1_lim_threshold=5):
 	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles
 
 	f1_curves_per_label = []
@@ -73,11 +73,16 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 
 			f1_curve.append(report_dict[pos_y]['f1-score'])
 
-			print(f'Itteration of X_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
+			if len(f1_curve) > f1_lim_threshold and (f1_curve[-f1_lim_threshold:] == np.array([1.0]*f1_lim_threshold)).all():
+				print('Maxing F1, skipping to next label')
+				break
+			else:
+				print('Current F1 trend:',f1_curve)
+				print(f'Itteration of X_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
 
 		f1_curves_per_label.append(f1_curve)
 		nl_counter+=1
-		print(f'Itteration of participant completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
+		print(f'Itteration of label completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
 
 	f1_matrix = pad_last_dim(f1_curves_per_label)
 

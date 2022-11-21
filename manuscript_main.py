@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import f1_score
 
 import copy
+import pickle
 from random import seed, randint
 from sklearn.metrics import classification_report
 import tensorflow as tf
@@ -15,6 +16,8 @@ import manuscript_exp_func as mef
 irreg_surfaces_labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 
 # function to repeat partic_calib_curve & all_partic_calib_curve over multiple seeds
+
+# TODO: look into f1 of 1.0 very early, even for test data...? => rounding errors?, data leaking?
 
 def f1_vs_C_tr(seed=214):
 	global _cached_Irregular_Surface_Dataset
@@ -33,16 +36,18 @@ def f1_vs_C_tr(seed=214):
 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
 	#=================
-	# matrix = mef.all_partic_calib_curve(ann, X_te, Y_te, P_te)
+	matrix = mef.all_partic_calib_curve(ann, X_te, Y_te, P_te)
 	#=================
-	# or quicker alternative
+	# or single participant
 	#=================
-	participants_dict = mef.perParticipantDict(X, Y, P)
-	p_id = participants_dict.keys()[0]
-	matrix = mef.paritic_calib_curve(ann, *participants_dict[p_id])
+	# participants_dict = mef.perParticipantDict(X_te, Y_te, P_te)
+	# p_id = list(participants_dict.keys())[0]
+	# matrix = mef.partic_calib_curve(ann, *participants_dict[p_id])
 	#=================
 
 	print(matrix)
+
+	pickle.dump(run_data, open('out/indiv_run_data.pkl','wb'))
 
 	# either graph each indiv or graph avg
 
