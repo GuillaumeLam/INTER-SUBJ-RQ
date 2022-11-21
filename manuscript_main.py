@@ -37,7 +37,7 @@ def f1_vs_C_tr(seed=214):
 	#=================
 	# or quicker alternative
 	#=================
-	participants_dict = perParticipantDict(X, Y, P)
+	participants_dict = mef.perParticipantDict(X, Y, P)
 	p_id = participants_dict.keys()[0]
 	matrix = mef.paritic_calib_curve(ann, *participants_dict[p_id])
 	#=================
