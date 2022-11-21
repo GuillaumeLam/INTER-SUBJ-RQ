@@ -49,7 +49,7 @@ class TDD_PaCalC(unittest.TestCase):
 			p_x = d[pos_y]
 			self.assertTrue((p_x == P_X[i]).all())
 
-	def test_pad_curves(self):
+	def test_pad_last_dim(self):
 		n_labels = 10
 		f1_curves_per_label = []
 
@@ -58,9 +58,31 @@ class TDD_PaCalC(unittest.TestCase):
 			i += 1
 			f1_curves_per_label.append(f1_curve)
 
-		F1 = PaCalC.pad_curves(f1_curves_per_label)
+		F1 = PaCalC.pad_last_dim(f1_curves_per_label)
 
 		self.assertEqual(F1.shape, (n_labels,n_labels))
+
+	def test_pad_last_dim_matrices(self):
+		n_labels = 10
+		f1_1 = []
+
+		for i in range(1,n_labels+1):
+			f1_curve = [(i)]*i
+			i += 1
+			f1_1.append(f1_curve)
+
+		f1_2 = []
+
+		for i in range(1,n_labels+1):
+			f1_curve = [(i)]*(i+1)
+			i += 1
+			f1_2.append(f1_curve)
+
+		f1_curves = [PaCalC.pad_last_dim(f1_1), PaCalC.pad_last_dim(f1_2)]
+
+		F1 = PaCalC.pad_last_dim(f1_curves)
+
+		self.assertEqual(F1.shape, (2,n_labels,n_labels+1))
 
 class PaCalC_exported_func(unittest.TestCase):
 

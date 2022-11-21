@@ -43,7 +43,7 @@ def partic_calib_curve(model, P_X, P_Y):
 		i+=1
 		f1_curves_per_label.append(f1_curve)
 
-	f1_matrix = pad_curves(f1_curves_per_label)
+	f1_matrix = pad_last_dim(f1_curves_per_label)
 
 	return f1_matrix
 
@@ -63,13 +63,14 @@ def avg_calib_curve(model,X,Y,P):
 
 	all_participants = []
 
+	# repeat partic_calib_curve over all participant
 	for p_id in participants_dict.keys():
 		all_participants.append(partic_calib_curve(*participants_dict[p_id]))
 
 	all_participants = np.array(all_participants)
 
-	# repeat partic_calib_curve over all participant
 	# average over participants (pad with last value [assumption: last value is highest] for shorter F1 vs C_tr arrays for all labels)
+	avg_f1_matrix
 	return None
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -143,18 +144,28 @@ def perLabelDict(P_X, P_Y):
 	return label_dict, min_cycles
 
 # arr => array of array
-def pad_curves(arr):
-
+def pad_last_dim(arr):
 	# find longest length sub array
 	l = 0
-	for subarr in arr:
-		if len(subarr)>l:
-			l = len(subarr)
+	for sub in arr:
+		# print(np.array(sub).shape)
+		l_sub = np.array(sub).shape[-1]
+		if l_sub>l:
+			l = l_sub
+
+	sub_shape = np.array(arr[0]).shape
 
 	# pad all sub arrays to longest sub array length with last subarray values
-	matrix = np.empty((0,l))
-	for subarr in arr:
-		padded_arr = subarr + [subarr[-1]]*(l-len(subarr))
-		matrix = np.append(matrix, np.array([padded_arr]), axis=0)
+	matrix = np.empty((0 , *(() if len(sub_shape)==1 else np.array(arr[0]).shape[:-1]) , l))
+
+	for sub in arr:
+		sub = np.array(sub)
+		l_sub = sub.shape[-1]
+
+		if len(sub_shape)==1:
+			padded_sub = np.append(sub, np.repeat(sub[...,-1],l-l_sub))
+		else:
+			padded_sub = np.hstack((sub, np.tile(sub[:,[-1]], l-l_sub)))
+		matrix = np.append(matrix, np.array([padded_sub]), axis=0)
 
 	return matrix
