@@ -1,5 +1,7 @@
 # Participant Calibration Curve (PaCalC)
 
+import sys
+
 import numpy as np
 from sklearn.metrics import f1_score
 
@@ -8,110 +10,151 @@ from sklearn.metrics import classification_report
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
-
 #======================>
 #  Exported Functions  >
 #======================>
 
-# p_calib_curve: generate F1 vs C_tr curves per label type for single participant
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# partiç_calib_curve: generate F1 vs C_tr curves per label type for single participant
 # in:
 #	-model
 #	-participant features (X)
 #	-participant labels	(Y)
 # out:
 #	-array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
-def p_calib_curve(model, P_X, P_Y):
-	return None
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# p_calib_curve: generate F1 vs C_tr curves per label type for all participants
+def partic_calib_curve(model, P_X, P_Y):
+	per_label_dict, min_cycles = perLabelDict(P_X, P_Y)
+
+	f1_curves_per_label = []
+	n_labels = len(per_label_dict.keys())
+
+	i = 1
+
+	for label in per_label_dict.keys():
+		# order per_label_dict.keys()
+
+		# train model on 1..n gait cycles & eval on else
+			# X -> per_label_dict[label]
+			# Y -> one_hot(label, n_labels) * len(X)
+
+		f1_curve = [(8+i)]*i # TO REPLACE
+		i+=1
+		f1_curves_per_label.append(f1_curve)
+
+	f1_matrix = pad_curves(f1_curves_per_label)
+
+	return f1_matrix
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# partic_calib_curve: generate F1 vs C_tr curves per label type for all participants
 # in:
 #	-model
 #	-dataset features (X)
-#	-dataset labels	(Y)
+#	-dataset one hot labels	(Y)
 #	-dataset participant id (P)
 # out:
 #	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 def avg_calib_curve(model,X,Y,P):
-	# repeat p_calib_curve over all participant
+	participants_dict = perParticipantDict(X, Y, P)
+
+	all_participants = []
+
+	for p_id in participants_dict.keys():
+		all_participants.append(partic_calib_curve(*participants_dict[p_id]))
+
+	all_participants = np.array(all_participants)
+
+	# repeat partic_calib_curve over all participant
 	# average over participants (pad with last value [assumption: last value is highest] for shorter F1 vs C_tr arrays for all labels)
 	return None
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
 # in: 
 #	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
 # out:
 #	-graph of F1 vs C_tr per label type; dim: |unique(Y)|
-def graph_calib_curve_per_Y(curves):
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+def graph_calib_curve_per_Y(curves, text_labels=None):
 	return None
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate graph of F1 vs C_tr averaged over label type
 # in: 
 #	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
 # out:
 #	-graph of F1 vs C_tr; dim: 1
-def graph_calib(curves):
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+def graph_calib(curves, text_labels=None):
 	return None
-
-#======================>
-#  Internal Functions  >
-#======================>
-
-def per_label_calib(sw_tr_model, sw_te):
-	X_te, Y_te, P_te = sw_te
-
-	participants_dict = {}
-
-	for i,_id_ in enumerate(P_te):
-		if not _id_ in participants_dict:
-			participants_dict[_id_] = ([],[]) # (P_X, P_Y)
-
-		participants_dict[_id_][0].append(X_te[i])
-		participants_dict[_id_][1].append(Y_te[i])
-
-	for p_id in participants_dict.keys():
-		per_label_dict, min_cycles = perLabelDict(participants_dict[p_id])
-
-		print('P_id:',p_id)
-		print('MIN cycles:',min_cycles)
-
-		# for label in per_label_dict.keys():
-			# train model on 1..n gait cycles & eval on else
-
-	# order participants by min # per label
-
-	# per n of calib gait cycles per label, train on n & eval on rest
-
-	# 
-
-# def repeated_eval(model, train_set, test_set, eval_schedule):
-
-# def graph_re()
 
 #====================>
 #  Helper Functions  >
 #====================>
 
+def perParticipantDict(X, Y, P):
+	participants_dict = {}
+
+	for i,_id_ in enumerate(P):
+		if not _id_ in participants_dict:
+			participants_dict[_id_] = ([],[]) # (P_X, P_Y)
+
+		participants_dict[_id_][0].append(X[i])
+		participants_dict[_id_][1].append(Y[i])
+
+	for k in participants_dict:
+		X,Y = participants_dict[k]
+		participants_dict[k] = (np.array(X),np.array(Y))
+
+	return participants_dict
+
 # perLabelDict: make dict of gait cycles per label of participant
+# in:
+# 	-one hot labels
 # return: 
 # 	-dict of gait cycles per label, 
 # 	-min number of gait cycles of all labels
-def perLabelDict(P_XY):
-	P_X, P_Y = P_XY
+def perLabelDict(P_X, P_Y):
 	label_dict = {}
 
-	for i, y in enumerate(P_Y):
-		print
-		o_h_surface = y.argmax()
-		if not o_h_surface in label_dict:
-			label_dict[o_h_surface] = []
+	for i, OHE_y in enumerate(P_Y):
+		pos_y = OHE_y.argmax()
+		if not pos_y in label_dict:
+			label_dict[pos_y] = []
 
-		label_dict[o_h_surface].append(P_X[i])
+		label_dict[pos_y].append(P_X[i])
 
-	min_cycles = 100000
+	for k in label_dict:
+		P_X = label_dict[k]
+		label_dict[k] = np.array(P_X)
 
-	for i in range(0,len(labels)):
+	min_cycles = sys.maxsize
+
+	for i in range(0,len(label_dict.keys())):
 		if min_cycles > np.array(label_dict[i]).shape[0]:
 			min_cycles = np.array(label_dict[i]).shape[0]
 
 	return label_dict, min_cycles
+
+# arr => array of array
+def pad_curves(arr):
+
+	# find longest length sub array
+	l = 0
+	for subarr in arr:
+		if len(subarr)>l:
+			l = len(subarr)
+
+	# pad all sub arrays to longest sub array length with last subarray values
+	matrix = np.empty((0,l))
+	for subarr in arr:
+		padded_arr = subarr + [subarr[-1]]*(l-len(subarr))
+		matrix = np.append(matrix, np.array([padded_arr]), axis=0)
+
+	return matrix
