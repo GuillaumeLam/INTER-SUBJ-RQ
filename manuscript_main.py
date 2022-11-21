@@ -17,7 +17,7 @@ irreg_surfaces_labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD'
 
 # function to repeat partic_calib_curve & all_partic_calib_curve over multiple seeds
 
-# TODO: look into f1 of 1.0 very early, even for test data...? => rounding errors?, data leaking?
+# TODO: look into f1 of 1.0 very early, even for test data...? => rounding errors?, data leaking?, WRONG LABEL (no trials => 100%)
 
 def f1_vs_C_tr(seed=214):
 	global _cached_Irregular_Surface_Dataset
@@ -47,7 +47,7 @@ def f1_vs_C_tr(seed=214):
 
 	print(matrix)
 
-	pickle.dump(run_data, open('out/indiv_run_data.pkl','wb'))
+	pickle.dump(matrix, open('out/indiv_run_data.pkl','wb'))
 
 	# either graph each indiv or graph avg
 

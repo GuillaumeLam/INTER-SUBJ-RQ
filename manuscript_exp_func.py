@@ -50,7 +50,7 @@ def partic_calib_curve(model, P_X, P_Y, seed=39, f1_lim_threshold=5):
 		Y[pos_y] = 1
 		Y = np.array([Y]*X.shape[0])
 
-		X_tr, X_te, Y_tr, Y_te= train_test_split(X, Y, test_size=0.1, random_state=seed) # update subject_wise_split to not take P/ =None if subject_wise=False
+		X_tr, X_te, Y_tr, Y_te = train_test_split(X, Y, test_size=0.5, random_state=seed) # update subject_wise_split to not take P/ =None if subject_wise=False
 
 		f1_curve = []
 		# train model on 1..n gait cycles & eval on else
@@ -155,7 +155,7 @@ def perLabelDict(P_X, P_Y):
 	label_dict = {}
 
 	for i, OHE_y in enumerate(P_Y):
-		pos_y = OHE_y.argmax()
+		pos_y = np.array(OHE_y).argmax()
 		if not pos_y in label_dict:
 			label_dict[pos_y] = []
 
