@@ -12,6 +12,27 @@ import matplotlib.pyplot as plt
 
 labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD', 'StrU']
 
+#======================
+#  Exported Functions
+#======================
+
+def p_calib_curve(model, P_X, P_Y):
+	return None
+
+def avg_calib_curve(model,X,Y,P):
+	return None
+
+def graph_calib_curve_per_Y(curves):
+	return None
+
+def graph_calib(curves):
+	return None
+
+#====================
+#  Helper Functions
+#====================
+
+
 # perLabel: make dict of gait cycles per label of participant
 # return: 
 # 		dict of gait cycles per label, 
@@ -69,13 +90,6 @@ def per_label_calib(sw_tr_model, sw_te):
 
 
 # def graph_re()
-
-#====================
-#  Helper Functions
-#====================
-
-
-DO TEST DRIVEN DEVELOPMENT
 
 
 if __name__ == "__main__":
