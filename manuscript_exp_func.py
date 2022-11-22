@@ -2,6 +2,7 @@
 
 import sys
 
+from random import seed, randint
 from sklearn.metrics import f1_score
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
@@ -12,6 +13,8 @@ import numpy as np
 import tensorflow as tf
 
 # from subject_wise_split import subject_wise_split
+
+seed(39)
 
 #======================>
 #  Exported Functions  >
@@ -33,7 +36,8 @@ import tensorflow as tf
 # -silence warning if no issue w/ real data
 # -return min_cycles
 
-def partic_calib_curve(model, P_X, P_Y, seed=39, f1_lim_threshold=5):
+def partic_calib_curve(model, P_X, P_Y, seed=39):
+	f1_lim_threshold=5
 	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles
 
 	f1_curves_per_label = []
@@ -96,7 +100,7 @@ def partic_calib_curve(model, P_X, P_Y, seed=39, f1_lim_threshold=5):
 #	-dataset one hot labels	(Y)
 #	-dataset participant id (P)
 # out:
-#	-particpant-averaged array of F1 vs C_tr per label type; dim:|unique(Y)| x max(|C_tr|)
+#	-array of F1 vs C_tr per label type per participant; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # TODO:
@@ -118,6 +122,30 @@ def all_partic_calib_curve(model,X,Y,P,seed=39):
 	# return avg_f1_matrix
 
 	return all_participants
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# calib_curve_cv: partic_calib_curve or all_partic_calib_curve with multiple seeds
+# in:
+#	-args: typical params for partic_calib_curve or all_partic_calib_curve
+# 	-cv=cv: number of folds over diffrent seeds 
+# out:
+#	-array of F1 vs C_tr per label type per participant per seed; dim:cv x |unique(P)| x |unique(Y)| x max(|C_tr|)
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# input same params for either _calib_curve()
+def calib_curve_cv(*args, cv=2):
+	seeds = [randint(0,1000) for _ in range(0,cv)]
+
+	results = []
+
+	for s in seeds:
+		if len(args) == 3:
+			matrix = partic_calib_curve(*args,seed)
+		elif len(args) == 4:
+			matrix = all_partic_calib_curve(*args,seed)
+		results.append(matrix)
+
+	return pad_last_dim(results)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
@@ -192,10 +220,13 @@ def pad_last_dim(arr):
 		sub = np.array(sub)
 		l_sub = sub.shape[-1]
 
-		if len(sub_shape)==1:
-			padded_sub = np.append(sub, np.repeat(sub[...,-1],l-l_sub))
+		if not l-l_sub is 0:
+			if len(sub_shape)==1:
+				padded_sub = np.append(sub, np.repeat(sub[...,-1],l-l_sub))
+			else:
+				padded_sub = np.hstack((sub, np.tile(sub[:,[-1]], l-l_sub)))
 		else:
-			padded_sub = np.hstack((sub, np.tile(sub[:,[-1]], l-l_sub)))
+			padded_sub = sub
 		matrix = np.append(matrix, np.array([padded_sub]), axis=0)
 
 	return matrix
