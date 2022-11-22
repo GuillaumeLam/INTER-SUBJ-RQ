@@ -82,7 +82,7 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 				break
 			else:
 				print('Current F1 trend:',f1_curve)
-				print(f'Itteration of X_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
+				print(f'Itteration of C_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
 
 		f1_curves_per_label.append(f1_curve)
 		nl_counter+=1
@@ -140,9 +140,9 @@ def calib_curve_cv(*args, cv=2):
 
 	for s in seeds:
 		if len(args) == 3:
-			matrix = partic_calib_curve(*args,seed)
+			matrix = partic_calib_curve(*args,s)
 		elif len(args) == 4:
-			matrix = all_partic_calib_curve(*args,seed)
+			matrix = all_partic_calib_curve(*args,s)
 		results.append(matrix)
 
 	return pad_last_dim(results)
