@@ -69,7 +69,7 @@ def PaCalC_p_cv(dtst_seed=214, p_cv=14, save=False):
 	# either graph each indiv or graph avg
 
 
-def PaCalC_dtst_cv(dtst_cv=14, p_cv=14, save=False):
+def PaCalC_dtst_cv(dtst_cv=4, p_cv=4, save=False):
 	dtst_seeds = [randint(0,1000) for _ in range(0,cv)]
 
 	out = []
