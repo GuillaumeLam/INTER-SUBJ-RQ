@@ -156,6 +156,49 @@ def calib_curve_cv(*args, cv=2):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def graph_calib_curve_per_Y(curves, text_labels=None):
+
+	label_f1 = np.array(label_f1)
+		avg_calib_f1 = np.mean(label_f1, axis=(0,1))
+
+		if std:
+			std_calib_f1 = np.std(label_f1, axis=(0,1))
+		else:
+			min_calib_f1 = np.min(label_f1, axis=(0,1))
+			max_calib_f1 = np.max(label_f1, axis=(0,1))
+
+		sw_f1 = np.mean(sw_f1, axis=1)
+		rw_f1 = np.mean(rw_f1, axis=1)
+
+		plt.plot(calib_sizes, avg_calib_f1)
+
+		if std:
+			plt.fill_between(
+				calib_sizes,
+				avg_calib_f1-std_calib_f1,
+				avg_calib_f1+std_calib_f1,
+				alpha=0.4
+			)
+		else:
+			plt.fill_between(
+				calib_sizes,
+				min_calib_f1,
+				max_calib_f1, 
+				alpha=0.4
+			)
+
+		plt.plot(0, np.mean(sw_f1), 'go',label='subject-wise')
+		plt.plot(calib_sizes[-1], np.mean(rw_f1), 'ro', label='random-wise')
+		plt.errorbar(0, np.mean(sw_f1), ecolor='green', yerr=np.std(sw_f1), capsize=10)
+		plt.errorbar(calib_sizes[-1], np.mean(rw_f1), ecolor='red', yerr=np.std(rw_f1), capsize=5)
+
+		plt.legend(loc='lower right')
+		plt.grid(linestyle='--', linewidth=0.5)
+		plt.xlabel('Calibration size')
+		if log_scale:
+			plt.xscale('symlog')
+		plt.ylabel('F1')
+		plt.title('F1 vs calibration size'+('(log)' if log_scale else ''))
+
 	return None
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
