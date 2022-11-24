@@ -61,18 +61,6 @@ class PaCalC_exported_func(unittest.TestCase):
 		
 		self.assertEqual(matrix.shape, (cv, 5, 2, 2))
 
-	# @unittest.expectedFailure
-	# def test_graph_calib_curve_per_Y(self):
-	# 	curve = None
-	# 	graph = graph_calib_curve_per_Y(curve)
-	# 	self.assertNotEqual(graph, None)
-
-	# @unittest.expectedFailure
-	# def test_graph_calib(self):
-	# 	curve = None
-	# 	graph = graph_calib(curve)
-	# 	self.assertNotEqual(graph, None)
-
 class TDD_PaCalC(unittest.TestCase):
 
 	def test_perLabelDict(self):
