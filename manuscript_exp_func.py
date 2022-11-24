@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 import tensorflow as tf
 
 # from subject_wise_split import subject_wise_split
@@ -100,7 +101,7 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 #	-dataset one hot labels	(Y)
 #	-dataset participant id (P)
 # out:
-#	-array of F1 vs C_tr per label type per participant; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
+#	-dict of F1 vs C_tr per label type per participant; dim:{|unique(P)|} => |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # TODO:
@@ -129,7 +130,7 @@ def all_partic_calib_curve(model,X,Y,P,seed=39):
 #	-args: typical params for partic_calib_curve or all_partic_calib_curve
 # 	-cv=cv: number of folds over diffrent seeds 
 # out:
-#	-array of F1 vs C_tr per label type per participant per seed; dim:cv x |unique(P)| x |unique(Y)| x max(|C_tr|)
+#	-array of F1 vs C_tr per label type per participant per seed; dim: cv x |unique(P)| x |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # input same params for either _calib_curve()
@@ -150,66 +151,84 @@ def calib_curve_cv(*args, cv=2):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
 # in: 
-#	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
+#	-F1 vs C_tr curves; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
 # out:
 #	-graph of F1 vs C_tr per label type; dim: |unique(Y)|
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def graph_calib_curve_per_Y(curves, text_labels=None):
+def graph_calib_curve_per_Y(curves):
 
-	label_f1 = np.array(label_f1)
-		avg_calib_f1 = np.mean(label_f1, axis=(0,1))
+	text_labels = pickle.load(open('graph/Irregular_Surface_labels.pkl','rb'))
 
-		if std:
-			std_calib_f1 = np.std(label_f1, axis=(0,1))
+	sw, rw = pickle.load(open('graph/sw-rw_F1_per_label.pkl','rb'))
+
+	sw_avg_f1_l, sw_std_f1_l = sw
+	rw_avg_f1_l, rw_std_f1_l = rw
+
+	for i, surface_label in enumerate(text_labels):
+		plt.subplot(3,3,i+1)
+		sw_avg_f1,sw_std_f1 = sw_avg_f1_l[i], sw_std_f1_l[i]
+		rw_avg_f1,rw_std_f1 = rw_avg_f1_l[i], rw_std_f1_l[i]
+		if i == 0:
+			standard_F1_Ctr_graph(curves[:,i,:], ((sw_avg_f1,sw_std_f1),(rw_avg_f1,rw_std_f1)), title_label=text_labels[i])
 		else:
-			min_calib_f1 = np.min(label_f1, axis=(0,1))
-			max_calib_f1 = np.max(label_f1, axis=(0,1))
+			standard_F1_Ctr_graph(curves[:,i,:], ((sw_avg_f1,sw_std_f1),(rw_avg_f1,rw_std_f1)), title_label=text_labels[i], sw_rw_labels=False)
+		
+		if i == 3:
+			plt.ylabel('F1')
+		elif i == 7:
+			plt.xlabel('Calibration size')
 
-		sw_f1 = np.mean(sw_f1, axis=1)
-		rw_f1 = np.mean(rw_f1, axis=1)
+	# for i, l in enumerate(label_f1):
 
-		plt.plot(calib_sizes, avg_calib_f1)
+	# 		if i == 0:
+	# 			plt.plot(0, sw_avg_f1[i], 'go',label='subject-wise')
+	# 			plt.plot(calib_sizes[-1], rw_avg_f1[i], 'ro', label='random-wise')
+	# 		else:
+	# 			plt.plot(0, sw_avg_f1[i], 'go')
+	# 			plt.plot(calib_sizes[-1], rw_avg_f1[i], 'ro')
 
-		if std:
-			plt.fill_between(
-				calib_sizes,
-				avg_calib_f1-std_calib_f1,
-				avg_calib_f1+std_calib_f1,
-				alpha=0.4
-			)
-		else:
-			plt.fill_between(
-				calib_sizes,
-				min_calib_f1,
-				max_calib_f1, 
-				alpha=0.4
-			)
+	plt.figlegend()
+	plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+	plt.suptitle('F1 vs calibration size per surface types')
 
-		plt.plot(0, np.mean(sw_f1), 'go',label='subject-wise')
-		plt.plot(calib_sizes[-1], np.mean(rw_f1), 'ro', label='random-wise')
-		plt.errorbar(0, np.mean(sw_f1), ecolor='green', yerr=np.std(sw_f1), capsize=10)
-		plt.errorbar(calib_sizes[-1], np.mean(rw_f1), ecolor='red', yerr=np.std(rw_f1), capsize=5)
-
-		plt.legend(loc='lower right')
-		plt.grid(linestyle='--', linewidth=0.5)
-		plt.xlabel('Calibration size')
-		if log_scale:
-			plt.xscale('symlog')
-		plt.ylabel('F1')
-		plt.title('F1 vs calibration size'+('(log)' if log_scale else ''))
+	plt.show()
 
 	return None
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate graph of F1 vs C_tr averaged over label type
 # in: 
-#	-F1 vs C_tr curves; dim:|unique(Y)| x max(|C_tr|)
+#	-F1 vs C_tr curves; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
+# 	-(OPTIONAL) sw_rw: (sw,rw) where xw=(xw_avg_f1,xw_std_f1) 
 # out:
 #	-graph of F1 vs C_tr; dim: 1
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def graph_calib(curves, text_labels=None):
+def graph_calib(curves):
+	sw, rw = pickle.load(open('graph/sw-rw_F1_per_label.pkl','rb'))
+
+	sw_avg_f1_l, _ = sw
+	rw_avg_f1_l, _ = rw
+
+	sw_avg_f1 = np.mean(sw_avg_f1_l)
+	sw_std_f1 = np.std(sw_avg_f1_l)
+	rw_avg_f1 = np.mean(rw_avg_f1_l)
+	rw_std_f1 = np.std(rw_avg_f1_l)
+
+	# f1_Ctr_avged_P = np.mean(curves, axis=0)
+	f1_Ctr_avged_l = np.mean(curves, axis=1)
+
+	standard_F1_Ctr_graph(f1_Ctr_avged_l, ((sw_avg_f1,sw_std_f1),(rw_avg_f1,rw_std_f1)))
+
+	plt.ylabel('F1')
+	plt.xlabel('Calibration size')
+
+	plt.legend(loc='lower right')
+	plt.title('F1 vs calibration set size')
+
+	plt.show()
+
 	return None
 
 #====================>
@@ -297,3 +316,36 @@ def keras_model_cpy(model):
 	model_cpy.set_weights(model.get_weights())
 
 	return model_cpy
+
+# curve: dim = (n,|C_tr|)
+def standard_F1_Ctr_graph(curve, sw_rw, title_label=None, sw_rw_labels=True):
+	# graph main curve with std
+	avg_calib_f1 = np.mean(curve, axis=0)
+	std_calib_f1 = np.std(curve, axis=0)
+
+	x_axis = list(range(curve.shape[-1]))
+
+	plt.plot(avg_calib_f1)
+
+	plt.fill_between(
+		x_axis,
+		avg_calib_f1-std_calib_f1,
+		avg_calib_f1+std_calib_f1,
+		alpha=0.4
+	)
+
+	# graph end points with their error bars
+	sw, rw = sw_rw
+	sw_avg_f1, sw_std_f1 = sw
+	rw_avg_f1, rw_std_f1 = rw
+
+	plt.plot(0, sw_avg_f1, 'go',label='subject-wise' if sw_rw_labels else None)
+	plt.errorbar(0, sw_avg_f1, ecolor='green', yerr=sw_std_f1, capsize=10)
+
+	plt.plot(x_axis[-1], rw_avg_f1, 'ro', label='random-wise' if sw_rw_labels else None)
+	plt.errorbar(x_axis[-1], rw_avg_f1, ecolor='red', yerr=rw_std_f1, capsize=5)
+
+	plt.grid(linestyle='--', linewidth=0.5)
+	
+	if not title_label is None:
+		plt.title(title_label)
