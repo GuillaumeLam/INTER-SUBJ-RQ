@@ -2,7 +2,6 @@
 
 import sys
 
-from random import seed, randint
 from sklearn.metrics import f1_score
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
@@ -10,18 +9,15 @@ from sklearn.model_selection import train_test_split
 import copy
 import matplotlib.pyplot as plt
 import numpy as np
+from random import seed, randint
 import pickle
 import tensorflow as tf
-
-# from subject_wise_split import subject_wise_split
 
 seed(39)
 
 #======================>
 #  Exported Functions  >
 #======================>
-
-# TO ADD: function for rnd seeds over 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # partiç_calib_curve: generate F1 vs C_tr curves per label type for single participant
@@ -35,11 +31,10 @@ seed(39)
 
 # TODO: 
 # -silence warning if no issue w/ real data
-# -return min_cycles
 
 def partic_calib_curve(model, P_X, P_Y, seed=39):
 	f1_lim_threshold=5
-	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles
+	per_label_dict, min_cycles = perLabelDict(P_X, P_Y) # do stats w/ min_cycles?
 
 	f1_curves_per_label = []
 	n_labels = len(per_label_dict.keys())
@@ -50,14 +45,15 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 
 	nl_counter = 0
 
-	for pos_y, X in per_label_dict.items():		# ordered labels
+	for pos_y, X in per_label_dict.items():
 		Y = [0]*n_labels
 		Y[pos_y] = 1
 		Y = np.array([Y]*X.shape[0])
 
-		X_tr, X_te, Y_tr, Y_te = train_test_split(X, Y, test_size=0.5, random_state=seed) # update subject_wise_split to not take P/ =None if subject_wise=False
+		X_tr, X_te, Y_tr, Y_te = train_test_split(X, Y, test_size=0.5, random_state=seed)
 
 		f1_curve = []
+
 		# train model on 1..n gait cycles & eval on else
 		for i in range(len(X_tr)):
 			model_cpy = keras_model_cpy(model)
@@ -95,6 +91,30 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 
 	return f1_matrix
 
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# pcc_cv: partic_calib_curve with different seeds
+# out:
+#	-array of F1 vs C_tr per label type; dim:|cv| x |unique(Y)| x max(|C_tr|)
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+def pcc_cv(model, P_X, P_Y, cv=2):
+	seeds = [randint(0,1000) for _ in range(0,cv)]
+
+	results = []
+
+	for i,s in enumerate(seeds):
+		matrix = partic_calib_curve(model, P_X, P_Y,s)
+		results.append(matrix)
+
+		print('='*30)
+		print(f'Seed progress: {i+1}/{cv}={(i+1)/cv*100}%')
+		print(f'\nCalibration Fold Completed for seed:{s}\n')
+		print('='*30)
+
+	return pad_last_dim(results)
+
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # partic_calib_curve: generate F1 vs C_tr curves per label type for all participants
 # in:
@@ -116,64 +136,14 @@ def all_partic_calib_curve(model,X,Y,P,seed=39):
 
 	# repeat partic_calib_curve over all participant
 	for i,p_id in enumerate(participants_data.keys()):
-		# if p_id not in participants_curves:
-		# 	participants_curves[p_id] = []
-		# participants_curves[p_id].append(partic_calib_curve(model,*participants_data[p_id],seed))
 		participants_curves[p_id] = partic_calib_curve(model,*participants_data[p_id],seed)
 		print('='*30)
 		print(f'P progress: {i+1}/{len(participants_data.keys())}={(i+1)/len(participants_data.keys())*100}%')
 		print(f'\nCalibration Curve Computed for P:{p_id}\n')
 		print('='*30)
 
-	# for p_id in participants_curves.keys():
-	# 	participants_curves[p_id] = pad_last_dim(participants_curves[p_id])
-
 	return participants_curves
 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# calib_curve_cv: partic_calib_curve or all_partic_calib_curve with multiple seeds
-# in:
-#	-args: typical params for partic_calib_curve or all_partic_calib_curve
-# 	-cv=cv: number of folds over different seeds 
-# out:
-#	-array of F1 vs C_tr per label type per participant per seed; dim: cv x |unique(P)| x |unique(Y)| x max(|C_tr|)
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-# # input same params for either _calib_curve()
-# def calib_curve_cv(*args, cv=2):
-# 	seeds = [randint(0,1000) for _ in range(0,cv)]
-
-# 	results = []
-
-# 	for s in seeds:
-# 		if len(args) == 3:
-# 			matrix = partic_calib_curve(*args,s)
-# 		elif len(args) == 4:
-# 			matrix = all_partic_calib_curve(*args,s)
-# 		results.append(matrix)
-
-# 	return pad_last_dim(results)
-
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# pcc_cv: partic_calib_curve with different seeds
-# out:
-#	-array of F1 vs C_tr per label type; dim:|cv| x |unique(Y)| x max(|C_tr|)
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def pcc_cv(model, P_X, P_Y, cv=2):
-	seeds = [randint(0,1000) for _ in range(0,cv)]
-
-	results = []
-
-	for i,s in enumerate(seeds):
-		matrix = partic_calib_curve(model, P_X, P_Y,s)
-		results.append(matrix)
-
-		print('='*30)
-		print(f'Seed progress: {i+1}/{cv}={(i+1)/cv*100}%')
-		print(f'\nCalibration Fold Completed for seed:{s}\n')
-		print('='*30)
-
-	return pad_last_dim(results)
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # all_pcc_cv: all_partic_calib_curve with different seeds
@@ -210,15 +180,15 @@ def all_pcc_cv(model,X,Y,P, cv=2):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
 # in: 
-#	-F1 vs C_tr curves; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
-# out:
-#	-graph of F1 vs C_tr per label type; dim: |unique(Y)|
+#	-F1 vs C_tr curves; dim: n x |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def graph_calib_curve_per_Y(curves):
 
 	text_labels = pickle.load(open('graph/Irregular_Surface_labels.pkl','rb'))
 
+	# TODO: re-gen. these numbers with large # of folds
+	# take sw & rw as input
 	sw, rw = pickle.load(open('graph/sw-rw_F1_per_label.pkl','rb'))
 
 	sw_avg_f1_l, sw_std_f1_l = sw
@@ -238,31 +208,22 @@ def graph_calib_curve_per_Y(curves):
 		elif i == 7:
 			plt.xlabel('Calibration size')
 
-	# for i, l in enumerate(label_f1):
-
-	# 		if i == 0:
-	# 			plt.plot(0, sw_avg_f1[i], 'go',label='subject-wise')
-	# 			plt.plot(calib_sizes[-1], rw_avg_f1[i], 'ro', label='random-wise')
-	# 		else:
-	# 			plt.plot(0, sw_avg_f1[i], 'go')
-	# 			plt.plot(calib_sizes[-1], rw_avg_f1[i], 'ro')
-
 	plt.figlegend()
 	plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 	plt.suptitle('F1 vs calibration size per surface types')
 
 	plt.show()
 
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# graph_calib_curve_per_Y: generate graph of F1 vs C_tr averaged over label type
+# graph_calib_curve_general: generate graph of F1 vs C_tr averaged over label type
 # in: 
-#	-F1 vs C_tr curves; dim:|unique(P)| x |unique(Y)| x max(|C_tr|)
-# 	-(OPTIONAL) sw_rw: (sw,rw) where xw=(xw_avg_f1,xw_std_f1) 
-# out:
-#	-graph of F1 vs C_tr; dim: 1
+#	-F1 vs C_tr curves; dim: n x |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def graph_calib(curves):
+def graph_calib_curve_general(curves):
+	# TODO: re-gen. these numbers with large # of folds
+	# take sw & rw as input
 	sw, rw = pickle.load(open('graph/sw-rw_F1_per_label.pkl','rb'))
 
 	sw_avg_f1_l, _ = sw
@@ -273,7 +234,6 @@ def graph_calib(curves):
 	rw_avg_f1 = np.mean(rw_avg_f1_l)
 	rw_std_f1 = np.std(rw_avg_f1_l)
 
-	# f1_Ctr_avged_P = np.mean(curves, axis=0)
 	f1_Ctr_avged_l = np.mean(curves, axis=1)
 
 	standard_F1_Ctr_graph(f1_Ctr_avged_l, ((sw_avg_f1,sw_std_f1),(rw_avg_f1,rw_std_f1)))
@@ -285,6 +245,15 @@ def graph_calib(curves):
 	plt.title('F1 vs calibration set size')
 
 	plt.show()
+
+# TODO: finish up method
+# def sw_rw_gen(model,X,Y,P,cv):
+#	# try load 'graph/sw-rw_F1_per_label.pkl'
+#	# except
+# 		# split according to both schemes
+# 		# train & eval
+#		# save to 'graph/sw-rw_F1_per_label.pkl'
+# 	return sw,rw
 
 #====================>
 #  Helper Functions  >
@@ -323,7 +292,6 @@ def pad_last_dim(arr):
 	# find longest length sub array
 	l = 0
 	for sub in arr:
-		# print(np.array(sub).shape)
 		l_sub = np.array(sub).shape[-1]
 		if l_sub>l:
 			l = l_sub
@@ -372,7 +340,8 @@ def keras_model_cpy(model):
 
 	return model_cpy
 
-# curve: dim = (n,|C_tr|)
+# curve: n x |unique(Y)| x |max(C_tr)|
+# sw_rw: ((sw_avg_f1, sw_std_f1),(rw_avg_f1, rw_std_f1))
 def standard_F1_Ctr_graph(curve, sw_rw, title_label=None, sw_rw_labels=True):
 	# graph main curve with std
 	avg_calib_f1 = np.mean(curve, axis=0)
