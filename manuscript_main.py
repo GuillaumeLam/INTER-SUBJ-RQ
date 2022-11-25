@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import f1_score
 
 import copy
+import os
 import pickle
 from random import seed, randint
 from sklearn.metrics import classification_report
@@ -19,7 +20,50 @@ irreg_surfaces_labels = ['BnkL','BnkR', 'CS', 'FE', 'GR', 'SlpD', 'SlpU', 'StrD'
 #	-look into f1 of 1.0 very early, even for test data...? => rounding errors?, data leaking?, WRONG LABEL (no trials => 100%)
 # 		-silence PaCalC keras calib warnings
 
-def PaCalC_F1(dtst_seed=214, save=False):
+# def PaCalC_F1(dtst_seed=214, save=False):
+# 	global _cached_Irregular_Surface_Dataset
+# 	_cached_Irregular_Surface_Dataset=None
+
+# 	X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(dtst_seed, True, split=0.1)
+
+# 	ann = make_model(X_tr, Y_tr)
+
+# 	# train model on X_tr, Y_tr
+# 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
+
+# 	#=================
+# 	matrix = PaCalC.all_partic_calib_curve(ann, X_te, Y_te, P_te)
+# 	#=================
+# 	# or single participant
+# 	#=================
+# 	# participants_dict = PaCalC.perParticipantDict(X_te, Y_te, P_te)
+# 	# p_id = list(participants_dict.keys())[0]
+# 	# matrix = PaCalC.partic_calib_curve(ann, *participants_dict[p_id])
+# 	#=================
+
+# 	print(matrix)
+
+# 	if save:
+# 		pickle.dump(matrix, open(f'out/PaCalC(dtst_seed={dtst_seed}).pkl','wb'))
+
+# 	# either graph each indiv or graph avg
+
+# def qwick(dtst_seed=214, calib_cv=2):
+# 	global _cached_Irregular_Surface_Dataset
+# 	_cached_Irregular_Surface_Dataset=None
+
+# 	X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(dtst_seed, True, split=0.1)
+
+# 	ann = make_model(X_tr, Y_tr)
+
+# 	# train model on X_tr, Y_tr
+# 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
+
+# 	m = PaCalC.all_pcc_cv(ann, X_te, Y_te, P_te, calib_cv)
+
+# 	print(m)
+	
+def PaCalC_F1(dtst_seed=214, calib_seed=39, save=False):
 	global _cached_Irregular_Surface_Dataset
 	_cached_Irregular_Surface_Dataset=None
 
@@ -30,49 +74,42 @@ def PaCalC_F1(dtst_seed=214, save=False):
 	# train model on X_tr, Y_tr
 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
-	#=================
-	matrix = PaCalC.all_partic_calib_curve(ann, X_te, Y_te, P_te)
-	#=================
-	# or single participant
-	#=================
-	# participants_dict = PaCalC.perParticipantDict(X_te, Y_te, P_te)
-	# p_id = list(participants_dict.keys())[0]
-	# matrix = PaCalC.partic_calib_curve(ann, *participants_dict[p_id])
-	#=================
+	D = PaCalC.all_partic_calib_curve(ann, X_te, Y_te, P_te, calib_seed)
 
-	print(matrix)
-
+	print(D)
 	if save:
-		pickle.dump(matrix, open(f'out/PaCalC(dtst_seed={dtst_seed}).pkl','wb'))
+		if not os.path.exists('out'):
+   			os.makedirs('out')
+		pickle.dump(D, open(f'out/PaCalC(dtst_seed={dtst_seed},calib_seed={calib_seed}).pkl','wb'))
 
 	# either graph each indiv or graph avg
 
 
-def PaCalC_p_cv(dtst_seed=214, p_cv=14, save=False):
-	global _cached_Irregular_Surface_Dataset
-	_cached_Irregular_Surface_Dataset=None
+# def PaCalC_calib_cv(dtst_seed=214, calib_cv=4, save=False):
+# 	global _cached_Irregular_Surface_Dataset
+# 	_cached_Irregular_Surface_Dataset=None
 
-	X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(dtst_seed, True, split=0.1)
+# 	X_tr, Y_tr, P_tr, X_te, Y_te, P_te = _CACHED_load_surface_data(dtst_seed, True, split=0.1)
 
-	ann = make_model(X_tr, Y_tr)
+# 	ann = make_model(X_tr, Y_tr)
 
-	# train model on X_tr, Y_tr
-	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
+# 	# train model on X_tr, Y_tr
+# 	ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
-	#=================
-	matrix = PaCalC.all_partic_calib_curve(ann, X_te, Y_te, P_te, p_cv)
+# 	D = PaCalC.all_pcc_cv(ann, X_te, Y_te, P_te, cv=calib_cv)
 
-	print(matrix)
-	if save:
-		pickle.dump(matrix, open(f'out/PaCalC(dtst_seed={dtst_seed},p_cv={p_cv}).pkl','wb'))
+# 	print(D)
+# 	if save:
+# 		pickle.dump(D, open(f'out/PaCalC(dtst_seed={dtst_seed},calib_cv={calib_cv}).pkl','wb'))
 
-	# either graph each indiv or graph avg
+# 	# either graph each indiv or graph avg
 
-
-def PaCalC_dtst_cv(dtst_cv=4, p_cv=4, save=False):
+# dtst_cv => multiple dataset subj-split seeds; will calib on diff participant
+# calib_cv => multiple calibration rnd-split seeds; will calib on same participants with diff gait cycles
+def PaCalC_dtst_cv(dtst_cv=4, calib_cv=4, save=False):
 	dtst_seeds = [randint(0,1000) for _ in range(0,dtst_cv)]
 
-	out = []
+	out = {}
 
 	for dtst_seed in dtst_seeds:
 		global _cached_Irregular_Surface_Dataset
@@ -85,16 +122,31 @@ def PaCalC_dtst_cv(dtst_cv=4, p_cv=4, save=False):
 		# train model on X_tr, Y_tr
 		ann.fit(X_tr,Y_tr,batch_size=512,epochs=50, validation_split=0.1)
 
-		#=================
-		matrix = PaCalC.all_partic_calib_curve(ann, X_te, Y_te, P_te, p_cv)
+		D = PaCalC.all_pcc_cv(ann, X_te, Y_te, P_te, cv=calib_cv)
 
-		print(matrix)
-		out.append(matrix)
+		for p_id in D.keys():
+			if p_id not in out:
+				out[p_id] = []
+			for m in D[p_id]:
+				out[p_id].append(m)
+
+		print('='*30)
+		print('\nDataset Fold Completed\n')
+		print('='*30)
+
+	# pad dict entries
+	for p_id in out.keys():
+		out[p_id] = PaCalC.pad_last_dim(out[p_id])
+
+	print(out)
 
 	if save:
-		pickle.dump(PaCalC.pad_last_dim(out), open(f'out/PaCalC(dtst_cv={dtst_cv},p_cv={p_cv}).pkl','wb'))
+		if not os.path.exists('out'):
+   			os.makedirs('out')
+		pickle.dump(out, open(f'out/PaCalC(dtst_cv={dtst_cv},p_cv={p_cv}).pkl','wb'))
 
 	# either graph each indiv or graph avg
+
 
 def make_model(X_tr, Y_tr):
 	Lab = GL2G.data_processing()
@@ -105,10 +157,43 @@ def make_model(X_tr, Y_tr):
 	ann=Lab.ANN(hid_layers=hid_layers,model=model,output=output,input_shape=input_shape,activation_hid='relu') # relu in hidden layers
 	return ann
 
+def main_graph_all_P():
+	# D = pickle.load(open('out/PaCalC(dtst_seed=214,calib_seed=39).pkl','rb'))
+	D = pickle.load(open('out/PaCalC(dtst_cv=2,calib_cv=2).pkl','rb'))
+
+	curves = PaCalC.collapse_P(D)
+
+	PaCalC.graph_calib(curves)
+
+def per_label_graph_all_P():
+	# D = pickle.load(open('out/PaCalC(dtst_seed=214,calib_seed=39).pkl','rb'))
+	D = pickle.load(open('out/PaCalC(dtst_cv=2,calib_cv=2).pkl','rb'))
+
+	curves = PaCalC.collapse_P(D)
+
+	PaCalC.graph_calib_curve_per_Y(curves)
+
+def main_graph_indiv_P():
+	# D = pickle.load(open('out/PaCalC(dtst_seed=214,calib_seed=39).pkl','rb'))
+	D = pickle.load(open('out/PaCalC(dtst_cv=2,calib_cv=2).pkl','rb'))
+
+	PaCalC.graph_calib(np.array([D[15]]))
+
+def per_label_graph_indiv_P():
+	# D = pickle.load(open('out/PaCalC(dtst_seed=214,calib_seed=39).pkl','rb'))
+	D = pickle.load(open('out/PaCalC(dtst_cv=2,calib_cv=2).pkl','rb'))
+
+	PaCalC.graph_calib_curve_per_Y(np.array([D[15]]))
+
 if __name__ == "__main__":
-	PaCalC_F1(save=True)
-	print('GREAT SUCCESS !')
-	PaCalC_p_cv(save=True)
-	print('GREAT SUCCESS !!')
-	PaCalC_dtst_cv(save=True)
-	print('GREAT SUCCESS !!!')
+	# PaCalC_F1(save=True)
+	# print('GREAT SUCCESS !'*5)
+	PaCalC_dtst_cv(dtst_cv=2, calib_cv=2, save=True)
+	print('GREAT SUCCESS !!'*5)
+
+	main_graph_all_P()
+	per_label_graph_all_P()
+	main_graph_indiv_P()
+	per_label_graph_indiv_P()
+
+	# qwick()

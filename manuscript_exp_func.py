@@ -87,7 +87,9 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 
 		f1_curves_per_label.append(f1_curve)
 		nl_counter+=1
+		print('='*30)
 		print(f'Itteration of label completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
+		print('='*30)
 
 	f1_matrix = pad_last_dim(f1_curves_per_label)
 
@@ -105,48 +107,105 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 # TODO:
-# -return p_id with associated min_cycles
+# -return p_id with associated min_cycles in dict
 
 def all_partic_calib_curve(model,X,Y,P,seed=39):
-	participants_dict = perParticipantDict(X, Y, P)
+	participants_data = perParticipantDict(X, Y, P)
 
-	all_participants = []
+	participants_curves = {}
 
 	# repeat partic_calib_curve over all participant
-	for p_id in participants_dict.keys():
-		all_participants.append(partic_calib_curve(model,*participants_dict[p_id],seed))
+	for i,p_id in enumerate(participants_data.keys()):
+		# if p_id not in participants_curves:
+		# 	participants_curves[p_id] = []
+		# participants_curves[p_id].append(partic_calib_curve(model,*participants_data[p_id],seed))
+		participants_curves[p_id] = partic_calib_curve(model,*participants_data[p_id],seed)
+		print('='*30)
+		print(f'P progress: {i+1}/{len(participants_data.keys())}={(i+1)/len(participants_data.keys())*100}%')
+		print(f'\nCalibration Curve Computed for P:{p_id}\n')
+		print('='*30)
 
-	all_participants = pad_last_dim(all_participants)
+	# for p_id in participants_curves.keys():
+	# 	participants_curves[p_id] = pad_last_dim(participants_curves[p_id])
 
-	# # average over participants (pad with last value [assumption: last value is highest F1] for shorter F1 vs C_tr arrays for all labels)
-	# avg_f1_matrix = np.mean(all_participants, axis=0)
-	# return avg_f1_matrix
-
-	return all_participants
+	return participants_curves
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # calib_curve_cv: partic_calib_curve or all_partic_calib_curve with multiple seeds
 # in:
 #	-args: typical params for partic_calib_curve or all_partic_calib_curve
-# 	-cv=cv: number of folds over diffrent seeds 
+# 	-cv=cv: number of folds over different seeds 
 # out:
 #	-array of F1 vs C_tr per label type per participant per seed; dim: cv x |unique(P)| x |unique(Y)| x max(|C_tr|)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# input same params for either _calib_curve()
-def calib_curve_cv(*args, cv=2):
+# # input same params for either _calib_curve()
+# def calib_curve_cv(*args, cv=2):
+# 	seeds = [randint(0,1000) for _ in range(0,cv)]
+
+# 	results = []
+
+# 	for s in seeds:
+# 		if len(args) == 3:
+# 			matrix = partic_calib_curve(*args,s)
+# 		elif len(args) == 4:
+# 			matrix = all_partic_calib_curve(*args,s)
+# 		results.append(matrix)
+
+# 	return pad_last_dim(results)
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# pcc_cv: partic_calib_curve with different seeds
+# out:
+#	-array of F1 vs C_tr per label type; dim:|cv| x |unique(Y)| x max(|C_tr|)
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+def pcc_cv(model, P_X, P_Y, cv=2):
 	seeds = [randint(0,1000) for _ in range(0,cv)]
 
 	results = []
 
-	for s in seeds:
-		if len(args) == 3:
-			matrix = partic_calib_curve(*args,s)
-		elif len(args) == 4:
-			matrix = all_partic_calib_curve(*args,s)
+	for i,s in enumerate(seeds):
+		matrix = partic_calib_curve(model, P_X, P_Y,s)
 		results.append(matrix)
 
+		print('='*30)
+		print(f'Seed progress: {i+1}/{cv}={(i+1)/cv*100}%')
+		print(f'\nCalibration Fold Completed for seed:{s}\n')
+		print('='*30)
+
 	return pad_last_dim(results)
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# all_pcc_cv: all_partic_calib_curve with different seeds
+# out:
+#	-dict of F1 vs C_tr per label type per participant; dim:{|unique(P)|} => |cv| x |unique(Y)| x max(|C_tr|)
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+def all_pcc_cv(model,X,Y,P, cv=2):
+	seeds = [randint(0,1000) for _ in range(0,cv)]
+
+	results = {}
+
+	for i,s in enumerate(seeds):
+		dictionary = all_partic_calib_curve(model,X,Y,P,s)
+
+		# integrate folds into results dict
+		for p_id in dictionary.keys():
+			if p_id not in results:
+				results[p_id] = []
+			results[p_id].append(dictionary[p_id])
+
+		print('='*30)
+		print(f'Seed progress: {i+1}/{cv}={(i+1)/cv*100}%')
+		print(f'\nCalibration Fold Completed for seed:{seed}\n')
+		print('='*30)
+
+	# pad dict entries
+	for p_id in results.keys():
+		results[p_id] = pad_last_dim(results[p_id])
+
+	return results
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate detailed graph of F1 vs C_tr per label type
@@ -349,3 +408,15 @@ def standard_F1_Ctr_graph(curve, sw_rw, title_label=None, sw_rw_labels=True):
 	
 	if not title_label is None:
 		plt.title(title_label)
+
+def collapse_P(d):
+	out = []
+
+	for p_id in d.keys():
+		if len(d[p_id].shape)==2:	# calib_seed
+			out.append(d[p_id])
+		elif len(d[p_id].shape)==3:	# calib_cv
+			for curve in d[p_id]:
+				out.append(curve)
+
+	return pad_last_dim(out)
