@@ -83,12 +83,12 @@ def partic_calib_curve(model, P_X, P_Y, seed=39):
 				break
 			else:
 				print('Current F1 trend:',f1_curve)
-				print(f'Itteration of C_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
+				print(f'Iteration of C_tr completed {i+1}/{len(X_tr)}={(i+1)/len(X_tr)*100}%')
 
 		f1_curves_per_label.append(f1_curve)
 		nl_counter+=1
 		print('='*30)
-		print(f'Itteration of label completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
+		print(f'Iteration of label completed {nl_counter}/{n_labels}={nl_counter/n_labels*100}%')
 		print('='*30)
 
 	f1_matrix = pad_last_dim(f1_curves_per_label)
@@ -253,8 +253,6 @@ def graph_calib_curve_per_Y(curves):
 
 	plt.show()
 
-	return None
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # graph_calib_curve_per_Y: generate graph of F1 vs C_tr averaged over label type
 # in: 
@@ -287,8 +285,6 @@ def graph_calib(curves):
 	plt.title('F1 vs calibration set size')
 
 	plt.show()
-
-	return None
 
 #====================>
 #  Helper Functions  >

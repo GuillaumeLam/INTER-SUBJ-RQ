@@ -143,7 +143,7 @@ def PaCalC_dtst_cv(dtst_cv=4, calib_cv=4, save=False):
 	if save:
 		if not os.path.exists('out'):
    			os.makedirs('out')
-		pickle.dump(out, open(f'out/PaCalC(dtst_cv={dtst_cv},p_cv={p_cv}).pkl','wb'))
+		pickle.dump(out, open(f'out/PaCalC(dtst_cv={dtst_cv},calib_cv={calib_cv}).pkl','wb'))
 
 	# either graph each indiv or graph avg
 

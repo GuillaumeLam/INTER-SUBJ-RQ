@@ -9,7 +9,8 @@ from tensorflow.keras.layers import Dense
 from load_data import load_surface_data, _CACHED_load_surface_data
 
 # exported methods
-from manuscript_exp_func import partic_calib_curve, all_partic_calib_curve, calib_curve_cv, graph_calib_curve_per_Y, graph_calib
+from manuscript_exp_func import partic_calib_curve, all_partic_calib_curve
+from manuscript_exp_func import pcc_cv, all_pcc_cv
 
 import manuscript_exp_func as PaCalC
 
@@ -41,38 +42,39 @@ class PaCalC_exported_func(unittest.TestCase):
 		self.assertEqual(matrix.shape, (2,6))
 
 	def test_all_partic_calib_curve(self):		
-		matrix = all_partic_calib_curve(TestHelperFunc.make_model(), *TestHelperFunc.XYP())
+		D = all_partic_calib_curve(TestHelperFunc.make_model(), *TestHelperFunc.XYP())
 		
-		self.assertEqual(matrix.shape, (5,2,2))
+		self.assertEqual(len(D.keys()), 5)
+
+		for matrix in D.values():
+			self.assertEqual(matrix.shape, (2,2))
 
 	def test_cv_single_partic(self):
 		cv = 2
 		
-		matrix = calib_curve_cv(TestHelperFunc.make_model(), *TestHelperFunc.P_XY(), cv=cv)
+		matrix = pcc_cv(TestHelperFunc.make_model(), *TestHelperFunc.P_XY(), cv=cv)
 		
-		print(matrix.shape)
-
 		self.assertEqual(matrix.shape, (cv,2,6))
 
 	def test_cv_all_partic(self):
 		cv = 2
 		
-		matrix = calib_curve_cv(TestHelperFunc.make_model(), *TestHelperFunc.XYP(), cv=cv)
+		D = all_pcc_cv(TestHelperFunc.make_model(), *TestHelperFunc.XYP(), cv=cv)
 		
-		self.assertEqual(matrix.shape, (cv, 5, 2, 2))
+		for matrix in D.values():
+			self.assertEqual(matrix.shape[:2], (cv, 2))
 
 class TDD_PaCalC(unittest.TestCase):
 
 	def test_perLabelDict(self):
-		P_X, P_Y = np.random.rand(10,100), np.array([[1,0]]*5+[[0,1]]*5)
+		P_X, P_Y = TestHelperFunc.P_XY()
+		d,_ = PaCalC.perLabelDict(P_X, P_Y)
 
-		d,m = PaCalC.perLabelDict(P_X, P_Y)
+		for i, p_x in enumerate(d.values()):
+			in_PX = np.array(P_X[i*25:(i*25+25),:])
+			out_PX = np.array(p_x)
 
-		self.assertEqual(m,5) # 10 cyles btwn 2 labels => 5 cycles per label
-
-		for i, (y, p_x) in enumerate(d.items()):
-			pos_y = y.argmax()
-			self.assertTrue((p_x == np.array(P_X[i*5:(i*5+5),:])).all())
+			self.assertTrue((out_PX == in_PX).all())
 
 	def test_pad_last_dim(self):
 		n_labels = 10
@@ -110,11 +112,10 @@ class TDD_PaCalC(unittest.TestCase):
 		self.assertEqual(F1.shape, (2,n_labels,n_labels+1))
 
 	def test_perParticipantDict(self):
-		X, Y, P = np.random.rand(50,100), np.array([[1,0]]*25+[[0,1]]*25), np.array([1,2,3,4,5]*10)
+		X,Y,P = TestHelperFunc.XYP()
+		d = PaCalC.perParticipantDict(X,Y,P)
 
-		d = PaCalC.perParticipantDict(X, Y, P)
-
-		for i, (_id_, xy) in enumerate(d.items()):
+		for i, xy in enumerate(d.values()):
 			x, y = xy
 			self.assertTrue((x == np.array(X[i::5,:])).all())
 			self.assertTrue((y == np.array([[1,0]]*5+[[0,1]]*5)).all())
